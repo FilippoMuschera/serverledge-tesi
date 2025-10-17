@@ -5,12 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/serverledge-faas/serverledge/internal/function"
 	"io"
 	"log"
 	"net/http"
 	"time"
-
-	"github.com/serverledge-faas/serverledge/internal/function"
 
 	"github.com/serverledge-faas/serverledge/internal/executor"
 )
@@ -95,7 +94,6 @@ func Execute(contID ContainerID, req *executor.InvocationRequest) (*executor.Inv
 	resp, waitDuration, err := sendPostRequestWithRetries(fmt.Sprintf("http://%s:%d/invoke", ipAddr,
 		executor.DEFAULT_EXECUTOR_PORT), postBodyB)
 	if err != nil {
-		_ = fmt.Errorf(cf.GetLog(contID)) // TEMPORARY TEST
 		if resp != nil {
 			buffer, err2 := io.ReadAll(resp.Body)
 			if err2 != nil {
