@@ -33,3 +33,7 @@ test:
 
 .PHONY: serverledge serverledge-cli lb executor test images
 
+clean:
+	@test -n "$(BIN)" && [ -d "$(BIN)" ] && rm -rf $(BIN) || { echo "Invalid BIN directory: $(BIN)"; exit 1; }
+
+
