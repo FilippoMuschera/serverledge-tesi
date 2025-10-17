@@ -4,10 +4,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/serverledge-faas/serverledge/internal/node"
 	"net/http"
 	"os"
 	"testing"
+
+	"github.com/serverledge-faas/serverledge/internal/node"
 
 	"github.com/serverledge-faas/serverledge/internal/cli"
 	"github.com/serverledge-faas/serverledge/internal/client"
@@ -37,7 +38,7 @@ func initializeExamplePyFunction() (*function.Function, error) {
 		Name:            "inc",
 		Runtime:         "python310",
 		MemoryMB:        PY_MEMORY,
-		CPUDemand:       1.0,
+		CPUDemand:       0.1,
 		Handler:         "inc.handler", // on python, for now is needed file name and handler name!!
 		TarFunctionCode: encoded,
 		Signature: function.NewSignature().
@@ -68,7 +69,7 @@ func initializeExampleJSFunction() (*function.Function, error) {
 		Name:            "inc",
 		Runtime:         "nodejs17ng",
 		MemoryMB:        JS_MEMORY,
-		CPUDemand:       1.0,
+		CPUDemand:       0.1,
 		Handler:         "inc", // for js, only the file name is needed!!
 		TarFunctionCode: encoded,
 		Signature: function.NewSignature().
@@ -99,7 +100,7 @@ func InitializePyFunction(name string, handler string, sign *function.Signature)
 		Name:            name,
 		Runtime:         "python310",
 		MemoryMB:        PY_MEMORY,
-		CPUDemand:       0.25,
+		CPUDemand:       0.1,
 		Handler:         fmt.Sprintf("%s.%s", name, handler), // on python, for now is needed file name and handler name!!
 		TarFunctionCode: encoded,
 		Signature:       sign,
@@ -126,7 +127,7 @@ func initializeJsFunction(name string, sign *function.Signature) (*function.Func
 		Name:            name,
 		Runtime:         "nodejs17ng",
 		MemoryMB:        JS_MEMORY,
-		CPUDemand:       0.25,
+		CPUDemand:       0.1,
 		Handler:         name, // on js only file name is needed!!
 		TarFunctionCode: encoded,
 		Signature:       sign,
