@@ -167,6 +167,33 @@ func CreateOrUpdateFunction(c echo.Context) error {
 			log.Printf("Forcing max concurrency = 1 for runtime %s\n", f.Runtime)
 			f.MaxConcurrency = 1
 		}
+		// If we have a custom runtime, then f.CustomImage will contain the image name
+		_, ok := container.CustomRuntimeToInfo[f.CustomImage]
+		if !ok {
+			//If I've never seen this custom runtime before, I'll add it to the map
+			archs, err := container.GetFactory().GetImageArchitectures(f.Runtime)
+			if err != nil {
+				log.Printf("Failed to get image architectures: %v\n", err)
+				return c.String(http.StatusInternalServerError, "Failed to get image architectures")
+			}
+
+			/* CustomRuntimeToInfo value "Image" is the empty string to save (just a little) memory. In fact, f.CustomImage
+			is the image name, and it's used as the key for the map. In the case of a custom runtime, the attribute f.Runtime
+			is simply "custom", and so it's not usable as a key for the map, and it's not worth keeping it in memory since it's
+			useless here (we already know is a custom runtime because the image is in CustomRuntimeToInfo). So what is actually
+			of interest here is the field Architectures, that will be used to keep track of where this function can be executed
+			(only x86 nodes, only ARM or both). I chose to use RuntimeInfo to keep it consistent with the map RuntimeToInfo
+			that we use for default runtimes (and images), without creating an overly specific data structure just for this case.
+			This way, future lookup for compatible architectures can be made the same way for both default and custom runtimes.
+			*/
+			container.CustomRuntimeToInfo[f.CustomImage] = container.RuntimeInfo{
+				Image:                "",
+				InvocationCmd:        nil,
+				ConcurrencySupported: false,
+				Architectures:        archs,
+			}
+		}
+
 	}
 
 	if f.MemoryMB < 1 {
