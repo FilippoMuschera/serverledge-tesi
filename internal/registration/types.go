@@ -2,6 +2,7 @@ package registration
 
 import (
 	"errors"
+
 	"github.com/hexablock/vivaldi"
 	"github.com/serverledge-faas/serverledge/internal/node"
 )
@@ -15,6 +16,7 @@ type NodeRegistration struct {
 	APIPort        int
 	UDPPort        int
 	IsLoadBalancer bool
+	Arch           string
 }
 
 type StatusInformation struct {
@@ -25,4 +27,5 @@ type StatusInformation struct {
 	UsedCPU                 float64
 	Coordinates             vivaldi.Coordinate
 	LoadAvg                 []float64
+	Arch                    string
 }

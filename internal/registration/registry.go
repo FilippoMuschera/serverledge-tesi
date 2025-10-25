@@ -2,17 +2,19 @@ package registration
 
 import (
 	"fmt"
-	"github.com/hexablock/vivaldi"
-	"github.com/serverledge-faas/serverledge/internal/node"
-	"golang.org/x/exp/maps"
 	"log"
 	"net"
 	"path"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/hexablock/vivaldi"
+	"github.com/serverledge-faas/serverledge/internal/node"
+	"golang.org/x/exp/maps"
 
 	"github.com/serverledge-faas/serverledge/internal/config"
 	"github.com/serverledge-faas/serverledge/utils"
@@ -41,9 +43,9 @@ var etcdLease clientv3.LeaseID
 
 func (r *NodeRegistration) toEtcdKey() (key string) {
 	if r.IsLoadBalancer {
-		return fmt.Sprintf("%s/%s/%s/%s", registryBaseDirectory, r.Area, registryLoadBalancerDirectory, r.Key)
+		return fmt.Sprintf("%s/%s/%s/%s/%s", registryBaseDirectory, r.Area, registryLoadBalancerDirectory, r.Key, r.Arch)
 	} else {
-		return fmt.Sprintf("%s/%s/%s", registryBaseDirectory, r.Area, r.Key)
+		return fmt.Sprintf("%s/%s/%s/%s", registryBaseDirectory, r.Area, r.Key, r.Arch)
 	}
 }
 
@@ -82,10 +84,11 @@ func registerToEtcd(asLoadBalancer bool) error {
 	registeredLocalIP := config.GetString(config.API_IP, defaultAddressStr)
 	apiPort := config.GetInt(config.API_PORT, 1323)
 	udpPort := config.GetInt(config.LISTEN_UDP_PORT, 9876)
+	arch := runtime.GOARCH
 
-	payload := fmt.Sprintf("%s;%d;%d", registeredLocalIP, apiPort, udpPort)
+	payload := fmt.Sprintf("%s;%d;%d;%s", registeredLocalIP, apiPort, udpPort, arch)
 
-	SelfRegistration = &NodeRegistration{NodeID: node.LocalNode, IPAddress: registeredLocalIP, APIPort: apiPort, UDPPort: udpPort, IsLoadBalancer: asLoadBalancer}
+	SelfRegistration = &NodeRegistration{NodeID: node.LocalNode, IPAddress: registeredLocalIP, APIPort: apiPort, UDPPort: udpPort, IsLoadBalancer: asLoadBalancer, Arch: arch}
 
 	// save couple (id, hostport) to the correct Area-dir on etcd
 	etcdKey := SelfRegistration.toEtcdKey()
@@ -126,7 +129,7 @@ func keepAliveLease() {
 func parseEtcdRegisteredNode(area string, key string, payload []byte) (NodeRegistration, error) {
 	payloadStr := string(payload)
 	split := strings.Split(payloadStr, ";")
-	if len(split) < 3 {
+	if len(split) < 4 {
 		return NodeRegistration{}, fmt.Errorf("invalid payload: %s", payloadStr)
 	}
 
@@ -142,7 +145,9 @@ func parseEtcdRegisteredNode(area string, key string, payload []byte) (NodeRegis
 		return NodeRegistration{}, err
 	}
 
-	return NodeRegistration{NodeID: node.NodeID{Area: area, Key: key}, IPAddress: ipAddress, APIPort: apiPort, UDPPort: udpPort}, nil
+	arch := split[3]
+
+	return NodeRegistration{NodeID: node.NodeID{Area: area, Key: key}, IPAddress: ipAddress, APIPort: apiPort, UDPPort: udpPort, Arch: arch}, nil
 }
 
 // GetNodesInArea is used to obtain the list of  other server's addresses under a specific local Area
