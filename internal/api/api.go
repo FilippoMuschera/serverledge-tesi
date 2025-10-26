@@ -171,9 +171,9 @@ func CreateOrUpdateFunction(c echo.Context) error {
 		_, ok := container.CustomRuntimeToInfo[f.CustomImage]
 		if !ok {
 			//If I've never seen this custom runtime before, I'll add it to the map
-			archs, err := container.GetFactory().GetImageArchitectures(f.Runtime)
+			archs, err := container.GetFactory().GetImageArchitectures(f.CustomImage)
 			if err != nil {
-				log.Printf("Failed to get image architectures: %v\n", err)
+				log.Printf("Failed to get image architectures for image %s: %v\n", f.CustomImage, err)
 				return c.String(http.StatusInternalServerError, "Failed to get image architectures")
 			}
 

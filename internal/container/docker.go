@@ -222,7 +222,7 @@ func (cf *DockerFactory) GetImageArchitectures(imageName string) ([]string, erro
 	var supportedArchitectures []string  // the list we will return
 	archSet := make(map[string]struct{}) // Use a set to avoid duplicates (it's just temporary, won't be returned)
 
-	if desc.MediaType.IsIndex() { // Multi-platform image (manifest list)
+	if desc.MediaType.IsIndex() { // Multi-platform images have an index manifest for the multiple architectures
 		idx, err := desc.ImageIndex()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get image index for %s: %w", imageName, err)
@@ -271,7 +271,8 @@ func (cf *DockerFactory) GetImageArchitectures(imageName string) ([]string, erro
 	archBytes, err := json.Marshal(supportedArchitectures)
 	if err != nil {
 		log.Printf("Warning: failed to marshal architectures for image %s: %v. Not caching in etcd.", imageName, err)
-		return supportedArchitectures, nil // Return what we found, even if not cached, is an etcd problem, not a runtime problem
+		// Return what we found, even if not cached, is an etcd problem, not a problem retrieving architectures
+		return supportedArchitectures, nil
 	}
 
 	_, err = etcdCli.Put(ctx, etcdKey, string(archBytes))
