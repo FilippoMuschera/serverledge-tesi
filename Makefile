@@ -31,7 +31,10 @@ push-images:
 test:
 	go test -v ./...
 
-.PHONY: serverledge serverledge-cli lb executor test images
+unit-test:
+	go test -v ./internal/container/...
+
+.PHONY: serverledge serverledge-cli lb executor test unit-test images
 
 clean:
 	@test -n "$(BIN)" && [ -d "$(BIN)" ] && rm -rf $(BIN) || { echo "Invalid BIN directory: $(BIN)"; exit 1; }
