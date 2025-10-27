@@ -40,8 +40,11 @@ func TestGetImageArchitectures(t *testing.T) {
 
 	t.Run("cached-etcd image", func(t *testing.T) {
 
-		// This test is time-sensitive, so it's not ideal. The best thing here is to also check the log, where wc
+		// This test is time-sensitive, so it's not ideal. The best thing here is to also check the log, where we
 		// can be 100% sure that the second invocation results in a cache hit.
+
+		//TODO For this test to run correctly is also important to make sure that the etcd db does not contain
+		//memcached:latest before starting the dest ("rm -rf default.etcd" in the folder where etcd is launched)
 
 		start := time.Now()
 		archs, err := cf.GetImageArchitectures("memcached:latest")
@@ -60,6 +63,7 @@ func TestGetImageArchitectures(t *testing.T) {
 		assert.Contains(t, archs, "arm64")
 		assert.Equal(t, len(archs), 2)
 		// The cached call should be significantly faster
+		log.Printf("Cached vs non cached time: %v vs %v\n", cacheElapsed, noCacheElapsed)
 		assert.Less(t, cacheElapsed, noCacheElapsed, "Cached call should be faster than non-cached call")
 
 	})
