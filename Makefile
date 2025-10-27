@@ -28,15 +28,17 @@ push-images:
 	docker push $(DOCKERHUB_USER)/serverledge-base
 	docker push $(DOCKERHUB_USER)/serverledge-nodejs17ng
 
+# Runs integration tests (all tests EXCEPT unit tests)
 test:
-	go test -v ./...
+	$(GO) test -v $(shell $(GO) list ./... | grep -v 'internal/container')
 
+# Runs only unit tests
 unit-test:
 	go test -v ./internal/container/...
 
-.PHONY: serverledge serverledge-cli lb executor test unit-test images
+.PHONY: serverledge serverledge-cli lb executor test unit-test integration-test images
 
 clean:
-	@test -n "$(BIN)" && [ -d "$(BIN)" ] && rm -rf $(BIN) || { echo "Invalid BIN directory: $(BIN)"; exit 1; }
+	@test -n "$(BIN)" && [ -d "$(BIN)" ] && rm -rf $(BIN) || { echo "Invalid BIN directory: $(BIN)"; exit 1; } && go clean -testcache
 
 
