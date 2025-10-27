@@ -43,9 +43,9 @@ var etcdLease clientv3.LeaseID
 
 func (r *NodeRegistration) toEtcdKey() (key string) {
 	if r.IsLoadBalancer {
-		return fmt.Sprintf("%s/%s/%s/%s/%s", registryBaseDirectory, r.Area, registryLoadBalancerDirectory, r.Key, r.Arch)
+		return fmt.Sprintf("%s/%s/%s/%s/%s", registryBaseDirectory, r.Area, registryLoadBalancerDirectory, r.Key, r.NodeID.Arch)
 	} else {
-		return fmt.Sprintf("%s/%s/%s/%s", registryBaseDirectory, r.Area, r.Key, r.Arch)
+		return fmt.Sprintf("%s/%s/%s/%s", registryBaseDirectory, r.Area, r.Key, r.NodeID.Arch)
 	}
 }
 
@@ -88,7 +88,7 @@ func registerToEtcd(asLoadBalancer bool) error {
 
 	payload := fmt.Sprintf("%s;%d;%d;%s", registeredLocalIP, apiPort, udpPort, arch)
 
-	SelfRegistration = &NodeRegistration{NodeID: node.LocalNode, IPAddress: registeredLocalIP, APIPort: apiPort, UDPPort: udpPort, IsLoadBalancer: asLoadBalancer, Arch: arch}
+	SelfRegistration = &NodeRegistration{NodeID: node.LocalNode, IPAddress: registeredLocalIP, APIPort: apiPort, UDPPort: udpPort, IsLoadBalancer: asLoadBalancer}
 
 	// save couple (id, hostport) to the correct Area-dir on etcd
 	etcdKey := SelfRegistration.toEtcdKey()
@@ -147,7 +147,7 @@ func parseEtcdRegisteredNode(area string, key string, payload []byte) (NodeRegis
 
 	arch := split[3]
 
-	return NodeRegistration{NodeID: node.NodeID{Area: area, Key: key}, IPAddress: ipAddress, APIPort: apiPort, UDPPort: udpPort, Arch: arch}, nil
+	return NodeRegistration{NodeID: node.NodeID{Area: area, Key: key, Arch: arch}, IPAddress: ipAddress, APIPort: apiPort, UDPPort: udpPort}, nil
 }
 
 // GetNodesInArea is used to obtain the list of  other server's addresses under a specific local Area

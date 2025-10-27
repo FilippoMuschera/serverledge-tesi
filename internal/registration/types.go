@@ -16,7 +16,6 @@ type NodeRegistration struct {
 	APIPort        int
 	UDPPort        int
 	IsLoadBalancer bool
-	Arch           string
 }
 
 type StatusInformation struct {
@@ -27,5 +26,4 @@ type StatusInformation struct {
 	UsedCPU                 float64
 	Coordinates             vivaldi.Coordinate
 	LoadAvg                 []float64
-	Arch                    string
 }
