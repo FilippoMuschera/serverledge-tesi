@@ -158,10 +158,10 @@ func CreateOrUpdateFunction(c echo.Context) error {
 		if !ok {
 			return c.JSON(http.StatusNotFound, "Invalid runtime.")
 		}
+		f.SupportedArchs = []string{container.X86, container.ARM}
 		if f.MaxConcurrency > 1 && !runtime.ConcurrencySupported {
 			log.Printf("Forcing max concurrency = 1 for runtime %s\n", f.Runtime)
 			f.MaxConcurrency = 1
-			f.SupportedArchs = []string{container.X86, container.ARM}
 		}
 	} else {
 		if f.MaxConcurrency > 1 {
