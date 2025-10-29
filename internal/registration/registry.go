@@ -43,9 +43,9 @@ var etcdLease clientv3.LeaseID
 
 func (r *NodeRegistration) toEtcdKey() (key string) {
 	if r.IsLoadBalancer {
-		return fmt.Sprintf("%s/%s/%s/%s/%s", registryBaseDirectory, r.Area, registryLoadBalancerDirectory, r.Key, r.NodeID.Arch)
+		return fmt.Sprintf("%s/%s/%s/%s/%s", registryBaseDirectory, r.Area, registryLoadBalancerDirectory, r.NodeID.Arch, r.Key)
 	} else {
-		return fmt.Sprintf("%s/%s/%s/%s", registryBaseDirectory, r.Area, r.Key, r.NodeID.Arch)
+		return fmt.Sprintf("%s/%s/%s/%s", registryBaseDirectory, r.Area, r.NodeID.Arch, r.Key)
 	}
 }
 
