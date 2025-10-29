@@ -232,10 +232,14 @@ func createApiIfNotExistsTest(t *testing.T, fn *function.Function, host string, 
 }
 
 func invokeApiTest(fn string, params map[string]interface{}, host string, port int) error {
+	return invokeApiTestSetOffloading(fn, params, host, port, true)
+}
+
+func invokeApiTestSetOffloading(fn string, params map[string]interface{}, host string, port int, offloading bool) error {
 	request := client.InvocationRequest{
 		Params:          params,
 		QoSMaxRespT:     250,
-		CanDoOffloading: true,
+		CanDoOffloading: offloading,
 		Async:           false,
 	}
 	invocationBody, err1 := json.Marshal(request)

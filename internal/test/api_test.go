@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/spf13/cast"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +12,7 @@ import (
 	"github.com/serverledge-faas/serverledge/internal/function"
 	"github.com/serverledge-faas/serverledge/internal/workflow"
 	"github.com/serverledge-faas/serverledge/utils"
+	"github.com/spf13/cast"
 )
 
 // TestContainerPool executes repeatedly different functions (**not compositions**) to verify the container pool
@@ -258,4 +259,36 @@ func TestAsyncInvokeWorkflow(t *testing.T) {
 
 	err = wflow.Delete()
 	utils.AssertNilMsg(t, err, "failed to delete composition")
+}
+
+// TestMismatchingArch tests that the execution fails if the node's architecture doesn't support the function's one
+// (and offloading is disabled)
+func TestMismatchingArchNoOffload(t *testing.T) {
+
+	name := "double"
+	fn, err := InitializePyFunction(name, "handler", function.NewSignature().
+		AddInput("input", function.Int{}).
+		AddOutput("result", function.Int{}).
+		Build())
+	utils.AssertNil(t, err)
+	currentArch := runtime.GOARCH
+	for i, arch := range fn.SupportedArchs {
+		if arch == currentArch {
+			fn.SupportedArchs = append(fn.SupportedArchs[:i], fn.SupportedArchs[i+1:]...)
+		}
+	}
+
+	createApiIfNotExistsTest(t, fn, HOST, PORT)
+
+	// executing all functions
+	x := make(map[string]interface{})
+	x["input"] = 1
+	fnName := name
+
+	time.Sleep(50 * time.Millisecond)
+	err = invokeApiTestSetOffloading(fnName, x, HOST, PORT, false) // no offloading
+	utils.AssertNonNil(t, err)                                     // Expecting an error due to mismatching architecture
+
+	// delete function
+	deleteApiTest(t, name, HOST, PORT)
 }
