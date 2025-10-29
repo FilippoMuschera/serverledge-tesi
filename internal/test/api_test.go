@@ -40,7 +40,7 @@ func TestContainerPool(t *testing.T) {
 			x["input"] = 1
 			fnName := name
 			go func() {
-				time.Sleep(50 * time.Millisecond)
+				time.Sleep(5 * time.Second)
 				err := invokeApiTest(fnName, x, HOST, PORT)
 				channel <- err
 			}()
