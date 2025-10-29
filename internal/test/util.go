@@ -19,6 +19,8 @@ import (
 
 const PY_MEMORY = 20
 const JS_MEMORY = 50
+const X86 = "amd64"
+const ARM = "arm64"
 
 func initializeExamplePyFunction() (*function.Function, error) {
 	oldF, found := function.GetFunction("inc")
@@ -40,6 +42,7 @@ func initializeExamplePyFunction() (*function.Function, error) {
 		MemoryMB:        PY_MEMORY,
 		CPUDemand:       0.1,
 		Handler:         "inc.handler", // on python, for now is needed file name and handler name!!
+		SupportedArchs:  []string{X86, ARM},
 		TarFunctionCode: encoded,
 		Signature: function.NewSignature().
 			AddInput("input", function.Int{}).
@@ -71,6 +74,7 @@ func initializeExampleJSFunction() (*function.Function, error) {
 		MemoryMB:        JS_MEMORY,
 		CPUDemand:       0.1,
 		Handler:         "inc", // for js, only the file name is needed!!
+		SupportedArchs:  []string{X86, ARM},
 		TarFunctionCode: encoded,
 		Signature: function.NewSignature().
 			AddInput("input", function.Int{}).
@@ -102,6 +106,7 @@ func InitializePyFunction(name string, handler string, sign *function.Signature)
 		MemoryMB:        PY_MEMORY,
 		CPUDemand:       0.1,
 		Handler:         fmt.Sprintf("%s.%s", name, handler), // on python, for now is needed file name and handler name!!
+		SupportedArchs:  []string{X86, ARM},
 		TarFunctionCode: encoded,
 		Signature:       sign,
 	}
@@ -129,6 +134,7 @@ func initializeJsFunction(name string, sign *function.Signature) (*function.Func
 		MemoryMB:        JS_MEMORY,
 		CPUDemand:       0.1,
 		Handler:         name, // on js only file name is needed!!
+		SupportedArchs:  []string{X86, ARM},
 		TarFunctionCode: encoded,
 		Signature:       sign,
 	}
