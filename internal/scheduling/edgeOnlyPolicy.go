@@ -17,12 +17,21 @@ func (p *EdgePolicy) OnCompletion(_ *function.Function, _ *function.ExecutionRep
 
 func (p *EdgePolicy) OnArrival(r *scheduledRequest) {
 	if r.CanDoOffloading {
-		url := pickEdgeNodeForOffloading(r)
+		url := pickEdgeNodeForOffloading(r) // this will now take into account the node architecture in the offloading process
 		if url != "" {
 			handleOffload(r, url)
 			return
 		}
 	} else {
+
+		if !r.Fun.SupportsArch(node.LocalNode.Arch) {
+			// If the current node architecture is not supported by the function's runtime, we can only drop it, since
+			// offloading was already tried unsuccessfully, or it was disabled for this request.
+			dropRequest(r)
+			return
+
+		}
+
 		containerID, warm, err := node.AcquireContainer(r.Fun, false)
 		if err == nil {
 			execLocally(r, containerID, warm)
