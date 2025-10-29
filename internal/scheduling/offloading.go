@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"time"
 
@@ -16,16 +15,48 @@ import (
 	"github.com/serverledge-faas/serverledge/internal/registration"
 )
 
+// Offloading choice caching
+var offloadingCache = make(map[string]*registration.NodeRegistration)
+var cacheExpiration = make(map[string]time.Time)
+var CacheValidity = 15 * time.Second
+
 func pickEdgeNodeForOffloading(r *scheduledRequest) (url string) {
-	// TODO: better to cache choice for a while
-	// TODO: check available mem as well
+	// check cache first
+	cached, ok := offloadingCache[r.Fun.Name]
+	if ok && time.Now().Before(cacheExpiration[r.Fun.Name]) {
+		return cached.APIUrl()
+	}
+
+	// select best node
 	nearestNeighbors := registration.GetNearestNeighbors()
 	if nearestNeighbors == nil {
 		return ""
 	}
 
-	randomItem := nearestNeighbors[rand.Intn(len(nearestNeighbors))]
-	return randomItem.APIUrl()
+	neighborStatus := registration.GetFullNeighborInfo()
+
+	var bestNode *registration.NodeRegistration
+	maxMem := int64(0)
+
+	for _, nodeReg := range nearestNeighbors {
+		status, ok := neighborStatus[nodeReg.Key]
+		if !ok {
+			continue
+		}
+		availableMemory := status.TotalMemory - status.UsedMemory
+		if r.Fun.SupportsArch(nodeReg.Arch) && availableMemory > maxMem {
+			maxMem = availableMemory
+			bestNode = &nodeReg
+		}
+	}
+
+	if bestNode != nil {
+		offloadingCache[r.Fun.Name] = bestNode
+		cacheExpiration[r.Fun.Name] = time.Now().Add(CacheValidity)
+		return bestNode.APIUrl()
+	}
+
+	return ""
 }
 
 func Offload(r *scheduledRequest, serverUrl string) error {
