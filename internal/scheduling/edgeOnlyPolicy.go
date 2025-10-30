@@ -2,6 +2,7 @@ package scheduling
 
 import (
 	"errors"
+	"log"
 
 	"github.com/serverledge-faas/serverledge/internal/config"
 	"github.com/serverledge-faas/serverledge/internal/function"
@@ -11,9 +12,11 @@ import (
 // EdgePolicy supports only Edge-Edge offloading. Always does offloading to an edge node if enabled. When offloading is not enabled executes the request locally.
 type EdgePolicy struct{}
 
-var fallBackLocally = config.GetBool(config.SCHEDULING_FALLBACK_LOCAL, false)
+var fallBackLocally bool
 
 func (p *EdgePolicy) Init() {
+	fallBackLocally = config.GetBool(config.SCHEDULING_FALLBACK_LOCAL, false)
+	log.Printf("[INFO] Initializing EdgePolicy. Fallback to local execution set to: %t\n", fallBackLocally)
 }
 
 func (p *EdgePolicy) OnCompletion(_ *function.Function, _ *function.ExecutionReport) {
