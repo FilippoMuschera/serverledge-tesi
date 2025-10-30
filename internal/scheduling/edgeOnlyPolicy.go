@@ -11,7 +11,7 @@ import (
 // EdgePolicy supports only Edge-Edge offloading. Always does offloading to an edge node if enabled. When offloading is not enabled executes the request locally.
 type EdgePolicy struct{}
 
-var fallBackLocally = config.GetBool(config.SCHEDULING_POLICY_FALLBACK_LOCAL, false)
+var fallBackLocally = config.GetBool(config.SCHEDULING_FALLBACK_LOCAL, false)
 
 func (p *EdgePolicy) Init() {
 }
@@ -37,6 +37,8 @@ func (p *EdgePolicy) OnArrival(r *scheduledRequest) {
 	} else {
 		tryLocalExecution(r)
 	}
+	dropRequest(r) // r.CanDoOffloading == true, NoSuitableNode == true && fallBackLocally == false leads here, so we drop
+	// the request in that case
 }
 
 func tryLocalExecution(r *scheduledRequest) {
