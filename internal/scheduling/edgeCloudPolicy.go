@@ -26,6 +26,7 @@ func (p *CloudEdgePolicy) OnArrival(r *scheduledRequest) {
 		containerID, warm, err := node.AcquireContainer(r.Fun, false)
 		if err == nil {
 			execLocally(r, containerID, warm)
+			return
 		}
 	}
 
