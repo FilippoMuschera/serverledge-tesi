@@ -3,6 +3,7 @@ package scheduling
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -19,18 +20,20 @@ import (
 var offloadingCache = make(map[string]*registration.NodeRegistration)
 var cacheExpiration = make(map[string]time.Time)
 var CacheValidity = 15 * time.Second
+var NoSuitableNode = errors.New("no node supporting the function's runtime found")
+var NoNeighbors = errors.New("the list of neighbors is empty")
 
-func pickEdgeNodeForOffloading(r *scheduledRequest) (url string) {
+func pickEdgeNodeForOffloading(r *scheduledRequest) (url string, err error) {
 	// check cache first
 	cached, ok := offloadingCache[r.Fun.Name]
 	if ok && time.Now().Before(cacheExpiration[r.Fun.Name]) {
-		return cached.APIUrl()
+		return cached.APIUrl(), nil
 	}
 
 	// select best node
 	nearestNeighbors := registration.GetNearestNeighbors()
 	if nearestNeighbors == nil {
-		return ""
+		return "", NoNeighbors
 	}
 
 	neighborStatus := registration.GetFullNeighborInfo()
@@ -53,10 +56,10 @@ func pickEdgeNodeForOffloading(r *scheduledRequest) (url string) {
 	if bestNode != nil {
 		offloadingCache[r.Fun.Name] = bestNode
 		cacheExpiration[r.Fun.Name] = time.Now().Add(CacheValidity)
-		return bestNode.APIUrl()
+		return bestNode.APIUrl(), nil
 	}
 
-	return ""
+	return "", NoSuitableNode
 }
 
 func Offload(r *scheduledRequest, serverUrl string) error {

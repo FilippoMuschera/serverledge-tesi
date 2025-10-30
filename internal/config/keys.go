@@ -69,6 +69,10 @@ const METRICS_RETRIEVER_INTERVAL = "metrics.retriever.interval"
 // Possible values: "qosaware", "default", "cloudonly"
 const SCHEDULING_POLICY = "scheduler.policy"
 
+// If "edgeonly" policy is set, tries to execute the offloadable functions locally in the case
+// where all neighbors won't support the function's runtime architecture
+const SCHEDULING_POLICY_FALLBACK_LOCAL = "scheduler.policy.fallback.local"
+
 // Capacity of the queue (possibly) used by the scheduler
 const SCHEDULER_QUEUE_CAPACITY = "scheduler.queue.capacity"
 
