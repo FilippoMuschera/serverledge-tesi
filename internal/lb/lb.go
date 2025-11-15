@@ -18,7 +18,8 @@ import (
 var currentTargets []*middleware.ProxyTarget
 
 func newBalancer(targets []*middleware.ProxyTarget) middleware.ProxyBalancer {
-	return middleware.NewRoundRobinBalancer(targets)
+	// old Load Balancer: return middleware.NewRoundRobinBalancer(targets)
+	return NewArchitectureAwareBalancer(targets)
 }
 
 func StartReverseProxy(e *echo.Echo, region string) {
@@ -55,7 +56,8 @@ func getTargets(region string) ([]*middleware.ProxyTarget, error) {
 		if err != nil {
 			return nil, err
 		}
-		targets = append(targets, &middleware.ProxyTarget{Name: target.Key, URL: parsedUrl})
+		archMap := echo.Map{"arch": target.Arch}
+		targets = append(targets, &middleware.ProxyTarget{Name: target.Key, URL: parsedUrl, Meta: archMap})
 	}
 
 	log.Printf("Found %d targets\n", len(targets))
