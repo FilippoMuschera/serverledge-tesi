@@ -34,11 +34,10 @@ test:
 
 # Runs only unit tests
 unit-test:
-	go test -v ./internal/container/...
+	go test -v -short ./internal/container/... ./internal/lb/...
 
 .PHONY: serverledge serverledge-cli lb executor test unit-test integration-test images
 
 clean:
 	@test -n "$(BIN)" && [ -d "$(BIN)" ] && rm -rf $(BIN) || { echo "Invalid BIN directory: $(BIN)"; exit 1; } && go clean -testcache
-
 
