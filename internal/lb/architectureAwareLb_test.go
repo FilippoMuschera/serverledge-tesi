@@ -126,3 +126,59 @@ func TestConsistentNodeMapping(t *testing.T) {
 		assert.Equal(t, firstTarget, nextTarget)
 	}
 }
+
+func TestGetNodeFromRing(t *testing.T) {
+	targets := []*middleware.ProxyTarget{
+		newTarget("arm1", container.ARM),
+		newTarget("arm2", container.ARM),
+	}
+	b := NewArchitectureAwareBalancer(targets)
+	nodeMap := map[string]struct{}{}
+	nodeMap["arm2"] = struct{}{}
+	mockMemChecker := &MockMemChecker{nodesWithEnoughMemory: nodeMap}
+	b.armRing.memChecker = mockMemChecker
+
+	fun := &function.Function{
+		Name:           "testGetNodeFromRingFunc",
+		SupportedArchs: []string{container.ARM},
+	}
+
+	// Add the function to the cache to avoid etcd dependency
+	cache.GetCacheInstance().Set(fun.Name, fun, 30*time.Second)
+	defer cache.GetCacheInstance().Delete(fun.Name)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/invoke/testGetNodeFromRingFunc", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	// First call
+	firstTarget := b.Next(c)
+	assert.NotNil(t, firstTarget)
+	assert.Equal(t, firstTarget.Name, "arm2")
+
+	// Subsequent calls should return the same target
+	for i := 0; i < 10; i++ {
+		nextTarget := b.Next(c)
+		assert.Equal(t, firstTarget, nextTarget)
+	}
+
+	delete(mockMemChecker.nodesWithEnoughMemory, "arm2")
+	nextTarget := b.Next(c)
+	assert.Nil(t, nextTarget)
+
+	mockMemChecker.nodesWithEnoughMemory["arm1"] = struct{}{}
+	nextTarget = b.Next(c)
+	assert.NotNil(t, nextTarget)
+	assert.Equal(t, nextTarget.Name, "arm1")
+
+}
+
+type MockMemChecker struct {
+	nodesWithEnoughMemory map[string]struct{}
+}
+
+func (m *MockMemChecker) HasEnoughMemory(target *middleware.ProxyTarget, fun *function.Function) bool {
+	_, ret := m.nodesWithEnoughMemory[target.Name]
+	return ret
+}
