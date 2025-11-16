@@ -15,6 +15,7 @@ import (
 type ArchitectureAwareBalancer struct {
 	mu sync.Mutex
 
+	// instead of classic lists we will use hashRings (see hashRing.go) to implement a consistent hashing technique
 	armRing *HashRing
 	x86Ring *HashRing
 }
@@ -22,6 +23,8 @@ type ArchitectureAwareBalancer struct {
 // NewArchitectureAwareBalancer Constructor
 func NewArchitectureAwareBalancer(targets []*middleware.ProxyTarget) *ArchitectureAwareBalancer {
 
+	// REPLICAS is the number of times each physical node will appear in the hash ring. This is done to improve how
+	// virtual nodes (i.e.: replicas of each physical node) are distributed over the ring, to reduce variation.
 	REPLICAS := 16
 
 	b := &ArchitectureAwareBalancer{
@@ -29,6 +32,8 @@ func NewArchitectureAwareBalancer(targets []*middleware.ProxyTarget) *Architectu
 		x86Ring: NewHashRing(REPLICAS),
 	}
 
+	// to stay consistent with the old RoundRobinLoadBalancer, we'll still a single target list, that will contain all nodes,
+	// both ARM and x86. We will now sort them into the respective hashRings.
 	for _, t := range targets {
 		arch := t.Meta["arch"]
 		if arch == container.ARM {
@@ -48,19 +53,22 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	funcName := extractFunctionName(c)
-	fun, ok := function.GetFunction(funcName)
+	//TODO check if selected node has enough memory, otherwise, pick another one
+
+	funcName := extractFunctionName(c)        // get function's name from request's URL
+	fun, ok := function.GetFunction(funcName) // we use this to leverage cache before asking etcd
 	if !ok {
 		log.Printf("Dropping request for unknown fun '%s'\n", funcName)
 		return nil
 	}
 
-	targetArch, err := b.selectArchitecture(fun)
+	targetArch, err := b.selectArchitecture(fun) // here the load balancer decides what architecture to use for this function
 	if err != nil {
 		log.Printf("Failed to select a target for function '%s': %v", funcName, err)
 		return nil // No suitable node found
 	}
 
+	// once we selected an architecture, we'll use consistent hashing to select what node to use
 	if targetArch == container.ARM {
 		return b.armRing.Get(funcName)
 	}
@@ -69,6 +77,7 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 
 }
 
+// extractFunctionName retrieves the function's name by parsing the request's URL.
 func extractFunctionName(c echo.Context) string {
 	path := c.Request().URL.Path
 
@@ -117,7 +126,7 @@ func (b *ArchitectureAwareBalancer) selectArchitecture(fun *function.Function) (
 	return "", fmt.Errorf("function does not support any available architecture")
 }
 
-// AddTarget Echo requires this method for dynamic load-balancing
+// AddTarget Echo requires this method for dynamic load-balancing. It simply inserts a new node in the respective ring.
 func (b *ArchitectureAwareBalancer) AddTarget(t *middleware.ProxyTarget) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
