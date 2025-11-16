@@ -174,6 +174,100 @@ func TestGetNodeFromRing(t *testing.T) {
 
 }
 
+func TestGetArchFallback(t *testing.T) {
+	targets := []*middleware.ProxyTarget{
+		newTarget("arm1", container.ARM),
+		newTarget("arm2", container.ARM),
+		newTarget("x86_1", container.X86),
+		newTarget("x86_2", container.X86),
+	}
+	b := NewArchitectureAwareBalancer(targets)
+	nodeMap := map[string]struct{}{}
+	nodeMap["x86_2"] = struct{}{}
+	mockMemChecker := &MockMemChecker{nodesWithEnoughMemory: nodeMap}
+	b.armRing.memChecker = mockMemChecker
+	b.x86Ring.memChecker = mockMemChecker
+
+	fun := &function.Function{
+		Name:           "testGetArchFallbackFunc",
+		SupportedArchs: []string{container.ARM, container.X86},
+	}
+
+	// Add the function to the cache to avoid etcd dependency
+	cache.GetCacheInstance().Set(fun.Name, fun, 30*time.Second)
+	defer cache.GetCacheInstance().Delete(fun.Name)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/invoke/testGetArchFallbackFunc", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	// First call
+	firstTarget := b.Next(c)
+	assert.NotNil(t, firstTarget)
+	assert.Equal(t, firstTarget.Name, "x86_2")
+
+	// Subsequent calls should return the same target
+	for i := 0; i < 10; i++ {
+		nextTarget := b.Next(c)
+		assert.Equal(t, firstTarget, nextTarget)
+	}
+
+	delete(mockMemChecker.nodesWithEnoughMemory, "x86_2")
+	nextTarget := b.Next(c)
+	assert.Nil(t, nextTarget)
+
+	mockMemChecker.nodesWithEnoughMemory["arm2"] = struct{}{}
+	nextTarget = b.Next(c)
+	assert.NotNil(t, nextTarget)
+	assert.Equal(t, nextTarget.Name, "arm2")
+
+}
+
+func TestGetArchFallbackNotPossible(t *testing.T) {
+	targets := []*middleware.ProxyTarget{
+		newTarget("arm1", container.ARM),
+		newTarget("arm2", container.ARM),
+		newTarget("x86_1", container.X86),
+	}
+	b := NewArchitectureAwareBalancer(targets)
+	nodeMap := map[string]struct{}{}
+	nodeMap["x86_1"] = struct{}{} // has enough memory but should still not be used because incompatible architecture
+	mockMemChecker := &MockMemChecker{nodesWithEnoughMemory: nodeMap}
+	b.armRing.memChecker = mockMemChecker
+	b.x86Ring.memChecker = mockMemChecker
+
+	fun := &function.Function{
+		Name:           "testGetArchFallbackNotPossibleFunc",
+		SupportedArchs: []string{container.ARM},
+	}
+
+	// Add the function to the cache to avoid etcd dependency
+	cache.GetCacheInstance().Set(fun.Name, fun, 30*time.Second)
+	defer cache.GetCacheInstance().Delete(fun.Name)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/invoke/testGetArchFallbackNotPossibleFunc", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	// First call
+	firstTarget := b.Next(c)
+	assert.Nil(t, firstTarget)
+
+	// Subsequent calls should return the same target
+	for i := 0; i < 10; i++ {
+		nextTarget := b.Next(c)
+		assert.Equal(t, firstTarget, nextTarget)
+	}
+
+	mockMemChecker.nodesWithEnoughMemory["arm1"] = struct{}{}
+	nextTarget := b.Next(c)
+	assert.NotNil(t, nextTarget)
+	assert.Equal(t, nextTarget.Name, "arm1")
+
+}
+
 type MockMemChecker struct {
 	nodesWithEnoughMemory map[string]struct{}
 }
