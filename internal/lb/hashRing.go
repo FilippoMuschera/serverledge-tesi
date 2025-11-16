@@ -7,19 +7,25 @@ import (
 	"sort"
 
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/serverledge-faas/serverledge/internal/function"
 )
 
 type HashRing struct {
-	replicas int
-	ring     []uint32                           // actual ring with hash of nodes
-	targets  map[uint32]*middleware.ProxyTarget // mapping hash(es) <-> node. Each node will have #replicas entries in the ring
+	replicas   int
+	ring       []uint32                           // actual ring with hash of nodes
+	targets    map[uint32]*middleware.ProxyTarget // mapping hash(es) <-> node. Each node will have #replicas entries in the ring
+	memChecker MemoryChecker                      // function to check if the node selected has enough memory to execute the function
+	// implemented this way to make the code testable by mocking this struct/function.
+
 }
 
 func NewHashRing(replicas int) *HashRing {
+
 	return &HashRing{
-		replicas: replicas,
-		ring:     make([]uint32, 0),
-		targets:  make(map[uint32]*middleware.ProxyTarget),
+		replicas:   replicas,
+		ring:       make([]uint32, 0),
+		targets:    make(map[uint32]*middleware.ProxyTarget),
+		memChecker: &DefaultMemoryChecker{},
 	}
 }
 
@@ -34,18 +40,51 @@ func (r *HashRing) Add(t *middleware.ProxyTarget) {
 	sort.Slice(r.ring, func(i, j int) bool { return r.ring[i] < r.ring[j] }) // sort the ring by hash
 }
 
-func (r *HashRing) Get(key string) *middleware.ProxyTarget {
+func (r *HashRing) Get(fun *function.Function) *middleware.ProxyTarget {
 	if len(r.ring) == 0 {
 		return nil
 	}
 
-	h := hash(key)
+	h := hash(fun.Name)
 	// we'll return the node whose hash is the next in the ring, starting from the hash of the function's name
 	idx := sort.Search(len(r.ring), func(i int) bool { return r.ring[i] >= h })
 	if idx == len(r.ring) {
 		idx = 0
 	}
-	return r.targets[r.ring[idx]] // here we use the map to get the node corresponding to the hash
+	candidate := r.targets[r.ring[idx]] // here we use the map to get the node corresponding to the hash
+
+	if r.memChecker.HasEnoughMemory(candidate, fun) {
+		return candidate
+	}
+
+	// If the node found by consistent hashing doesn't have enough memory, we'll try to find another node to execute the function
+	// by navigating the ring, so that the lookup order is consistent between different executions (if the nodes' pool doesn't change
+	// of course).
+	startingIdx := idx            // idx is still set to the candidate index in the ring
+	idx = (idx + 1) % len(r.ring) // next node in the ring
+
+	// since there are multiple replicas of every physical node, I'll keep track of nodes already considered as candiadates
+	// to skip them and make the lookup faster.
+	// E.g.: if the first candidate was node "Node-A", found by its replica "Node-A#1", there is no point in trying to see
+	// if "Node-A" has enough memory once I find it through its replica "Node-A#2", for example, that I may find while
+	// traversing the ring.
+	seen := make(map[string]struct{})
+	seen[candidate.Name] = struct{}{} // I already tried it
+
+	for idx != startingIdx { // as long as I have not completed a full circle
+		candidate = r.targets[r.ring[idx]]     // new candidate: idx is the replica's index. candidate is the corresponding physical node
+		_, alreadySeen := seen[candidate.Name] // I check if it's in the map (meaning I already tried it)
+
+		if !alreadySeen && r.memChecker.HasEnoughMemory(candidate, fun) {
+			return candidate
+		} else {
+			seen[candidate.Name] = struct{}{} // it's a map, it doesn't really matter if alreadySeen was true or not, there are no duplicates
+			idx = (idx + 1) % len(r.ring)
+		}
+	}
+
+	return nil // no suitable node found
+
 }
 
 func (r *HashRing) RemoveByName(name string) bool {

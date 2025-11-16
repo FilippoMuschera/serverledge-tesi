@@ -70,10 +70,10 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 
 	// once we selected an architecture, we'll use consistent hashing to select what node to use
 	if targetArch == container.ARM {
-		return b.armRing.Get(funcName)
+		return b.armRing.Get(fun)
 	}
 
-	return b.x86Ring.Get(funcName)
+	return b.x86Ring.Get(fun)
 
 }
 
