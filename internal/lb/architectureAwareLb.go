@@ -53,8 +53,6 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	//TODO check if selected node has enough memory, otherwise, pick another one
-
 	funcName := extractFunctionName(c)        // get function's name from request's URL
 	fun, ok := function.GetFunction(funcName) // we use this to leverage cache before asking etcd
 	if !ok {
@@ -69,12 +67,21 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 	}
 
 	// once we selected an architecture, we'll use consistent hashing to select what node to use
-	if targetArch == container.ARM {
-		return b.armRing.Get(fun)
+	// The Get function will cycle through the hashRing to find a suitable node. If none is find we try to check if in
+	// the other ring there is a suitable node for the function, to maximize chances of execution.
+	var candidate *middleware.ProxyTarget
+	if targetArch == container.ARM { // Prioritize ARM if selected
+		candidate = b.armRing.Get(fun)
+		if candidate == nil && fun.SupportsArch(container.X86) { // If no ARM node, try x86 if supported
+			candidate = b.x86Ring.Get(fun)
+		}
+	} else { // Prioritize x86 if selected
+		candidate = b.x86Ring.Get(fun)
+		if candidate == nil && fun.SupportsArch(container.ARM) { // If no x86 node, try ARM if supported
+			candidate = b.armRing.Get(fun)
+		}
 	}
-
-	return b.x86Ring.Get(fun)
-
+	return candidate
 }
 
 // extractFunctionName retrieves the function's name by parsing the request's URL.
