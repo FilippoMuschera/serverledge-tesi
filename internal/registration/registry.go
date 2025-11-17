@@ -199,7 +199,8 @@ func GetOneNodeInArea(area string, includeSelf bool) (NodeRegistration, error) {
 }
 
 func GetLBInArea(area string) (map[string]NodeRegistration, error) {
-	baseDir := areaEtcdKey(area) + "/" + registryLoadBalancerDirectory
+	//baseDir := areaEtcdKey(area) + "/" + registryLoadBalancerDirectory // bug?
+	baseDir := areaEtcdKey(area) + registryLoadBalancerDirectory // fix?
 
 	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
 
