@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/serverledge-faas/serverledge/internal/config"
 	"github.com/serverledge-faas/serverledge/internal/container"
 	"github.com/serverledge-faas/serverledge/internal/function"
 )
@@ -25,7 +26,8 @@ func NewArchitectureAwareBalancer(targets []*middleware.ProxyTarget) *Architectu
 
 	// REPLICAS is the number of times each physical node will appear in the hash ring. This is done to improve how
 	// virtual nodes (i.e.: replicas of each physical node) are distributed over the ring, to reduce variation.
-	REPLICAS := 16
+	REPLICAS := config.GetInt(config.REPLICAS, 16)
+	log.Printf("Running ArchitectureAwareLB with %d replicas per node in the hash rings\n", REPLICAS)
 
 	b := &ArchitectureAwareBalancer{
 		armRing: NewHashRing(REPLICAS),

@@ -50,6 +50,9 @@ const REG_NEARBY_INTERVAL = "registry.nearby.interval"
 // long period for general monitoring inside the area
 const REG_MONITORING_INTERVAL = "registry.monitoring.interval"
 
+// ArchitectureAwareLb: number of replicas in the HashRing for each physical node
+const REPLICAS = "lb.replicas"
+
 // port for udp status listener
 const LISTEN_UDP_PORT = "registry.udp.port"
 
