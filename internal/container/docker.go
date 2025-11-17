@@ -268,6 +268,7 @@ func (cf *DockerFactory) GetImageArchitectures(imageName string) ([]string, erro
 
 	// 3. Cache the result in etcd for future lookup (e.g.: another function executed in the same custom runtime, or can
 	// be used by another node if/when the function is offloaded) without having to hit the registry again.
+	// TODO maybe TTL for cache?
 	archBytes, err := json.Marshal(supportedArchitectures)
 	if err != nil {
 		log.Printf("Warning: failed to marshal architectures for image %s: %v. Not caching in etcd.", imageName, err)
