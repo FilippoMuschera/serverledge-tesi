@@ -2,6 +2,7 @@ package registration
 
 import (
 	"errors"
+
 	"github.com/hexablock/vivaldi"
 	"github.com/serverledge-faas/serverledge/internal/node"
 )

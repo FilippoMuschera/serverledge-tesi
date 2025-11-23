@@ -50,6 +50,9 @@ const REG_NEARBY_INTERVAL = "registry.nearby.interval"
 // long period for general monitoring inside the area
 const REG_MONITORING_INTERVAL = "registry.monitoring.interval"
 
+// ArchitectureAwareLb: number of replicas in the HashRing for each physical node
+const REPLICAS = "lb.replicas"
+
 // port for udp status listener
 const LISTEN_UDP_PORT = "registry.udp.port"
 
@@ -68,6 +71,10 @@ const METRICS_RETRIEVER_INTERVAL = "metrics.retriever.interval"
 // Scheduling policy to use
 // Possible values: "qosaware", "default", "cloudonly"
 const SCHEDULING_POLICY = "scheduler.policy"
+
+// If "edgeonly" policy is set, tries to execute the offloadable functions locally in the case
+// where all neighbors won't support the function's runtime architecture
+const SCHEDULING_FALLBACK_LOCAL = "scheduler.fallback.local"
 
 // Capacity of the queue (possibly) used by the scheduler
 const SCHEDULER_QUEUE_CAPACITY = "scheduler.queue.capacity"
