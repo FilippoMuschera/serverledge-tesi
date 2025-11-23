@@ -2,8 +2,7 @@ name: Run Tests CI
 
 on:
   push:
-    branches:
-      - ArchitectureAware
+
 
 jobs:
   build:
