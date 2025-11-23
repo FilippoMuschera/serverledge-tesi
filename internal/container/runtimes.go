@@ -17,6 +17,7 @@ var refreshedImages = map[string]bool{}
 var RuntimeToInfo = map[string]RuntimeInfo{
 	"python310":  {"fmuschera/serverledge-python310", []string{"python", "/entrypoint.py"}, true, []string{X86, ARM}},
 	"nodejs17ng": {"fmuschera/serverledge-nodejs17ng", []string{}, false, []string{X86, ARM}},
+	"java21":     {"fmuschera/serverledge-java21", []string{}, false, []string{X86, ARM}},
 }
 
 // CustomRuntimeToInfo Map to keep track of architectures compatible with each custom runtime image associated with a function registered
