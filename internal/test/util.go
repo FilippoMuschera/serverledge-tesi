@@ -19,6 +19,7 @@ import (
 
 const PY_MEMORY = 20
 const JS_MEMORY = 50
+const JAVA_MEMORY = 100
 const X86 = "amd64"
 const ARM = "arm64"
 
@@ -106,6 +107,34 @@ func InitializePyFunction(name string, handler string, sign *function.Signature)
 		MemoryMB:        PY_MEMORY,
 		CPUDemand:       0.1,
 		Handler:         fmt.Sprintf("%s.%s", name, handler), // on python, for now is needed file name and handler name!!
+		SupportedArchs:  []string{X86, ARM},
+		TarFunctionCode: encoded,
+		Signature:       sign,
+	}
+	err = f.SaveToEtcd()
+	return &f, err
+}
+
+func InitializeJavaFunction(name string, handler string, sign *function.Signature) (*function.Function, error) {
+	oldF, found := function.GetFunction(name)
+	if found {
+		// the function already exists; we delete it
+		oldF.Delete()
+		node.ShutdownWarmContainersFor(oldF)
+	}
+
+	srcPath := "../../examples/java_build/target/hello-function-1.0.0-jar-with-dependencies.jar"
+	srcContent, err := cli.ReadSourcesAsTar(srcPath)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read java sources %s as tar: %v", srcPath, err)
+	}
+	encoded := base64.StdEncoding.EncodeToString(srcContent)
+	f := function.Function{
+		Name:            name,
+		Runtime:         "java21",
+		MemoryMB:        JAVA_MEMORY,
+		CPUDemand:       0.1,
+		Handler:         handler,
 		SupportedArchs:  []string{X86, ARM},
 		TarFunctionCode: encoded,
 		Signature:       sign,
