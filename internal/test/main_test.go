@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"testing"
@@ -97,6 +98,8 @@ func TestMain(m *testing.M) {
 		os.Exit(int(codes.Internal))
 	}
 
+	waitForServerReady()
+
 	// run all test independently
 	code := m.Run()
 
@@ -106,6 +109,20 @@ func TestMain(m *testing.M) {
 		fmt.Printf("failed to remove serverledgde: %v\n", err)
 	}
 	os.Exit(code)
+}
+
+func waitForServerReady() {
+	// Wait for the server to be ready by polling the /status endpoint. There was a race condition in the test
+	// especially noticeable for less powerful hardware.
+	for i := 0; i < 50; i++ {
+		resp, err := http.Get(fmt.Sprintf("http://%s:%d/status", HOST, PORT))
+		if err == nil && resp.StatusCode == http.StatusOK {
+			log.Println("Server is ready.")
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	log.Fatal("Server not ready after timeout")
 }
 
 // startReliably can start the containers, or restart them if needed
