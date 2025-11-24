@@ -16,7 +16,7 @@ import (
 // Function describes a serverless function.
 type Function struct {
 	Name            string
-	Runtime         string   // example: python310
+	Runtime         string   // example: python314
 	MemoryMB        int64    // MB
 	CPUDemand       float64  // 1.0 -> 1 core
 	MaxConcurrency  int16    // intra-container maximum concurrency

@@ -39,7 +39,7 @@ func initializeExamplePyFunction() (*function.Function, error) {
 	encoded := base64.StdEncoding.EncodeToString(srcContent)
 	f := function.Function{
 		Name:            "inc",
-		Runtime:         "python310",
+		Runtime:         "python314",
 		MemoryMB:        PY_MEMORY,
 		CPUDemand:       0.1,
 		Handler:         "inc.handler", // on python, for now is needed file name and handler name!!
@@ -103,7 +103,7 @@ func InitializePyFunction(name string, handler string, sign *function.Signature)
 	encoded := base64.StdEncoding.EncodeToString(srcContent)
 	f := function.Function{
 		Name:            name,
-		Runtime:         "python310",
+		Runtime:         "python314",
 		MemoryMB:        PY_MEMORY,
 		CPUDemand:       0.1,
 		Handler:         fmt.Sprintf("%s.%s", name, handler), // on python, for now is needed file name and handler name!!
