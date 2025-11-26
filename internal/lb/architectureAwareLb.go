@@ -5,12 +5,14 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/serverledge-faas/serverledge/internal/config"
 	"github.com/serverledge-faas/serverledge/internal/container"
 	"github.com/serverledge-faas/serverledge/internal/function"
+	"github.com/serverledge-faas/serverledge/internal/registration"
 )
 
 type ArchitectureAwareBalancer struct {
@@ -38,10 +40,8 @@ func NewArchitectureAwareBalancer(targets []*middleware.ProxyTarget) *Architectu
 	// both ARM and x86. We will now sort them into the respective hashRings.
 	for _, t := range targets {
 		arch := t.Meta["arch"]
-		if arch == container.ARM {
-			b.armRing.Add(t)
-		} else if arch == container.X86 {
-			b.x86Ring.Add(t)
+		if arch == container.ARM || arch == container.X86 {
+			b.AddTarget(t)
 		} else {
 			log.Printf("Unknown architecture for node %s\n", t.Name)
 		}
@@ -82,6 +82,12 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 		if candidate == nil && fun.SupportsArch(container.ARM) { // If no x86 node, try ARM if supported
 			candidate = b.armRing.Get(fun)
 		}
+	}
+	if candidate != nil {
+		freeMemoryMB := NodeMetrics.GetFreeMemory(candidate.Name) - fun.MemoryMB
+		// Remove the memory that this function will use (this will then be updated again once the function is executed)
+		NodeMetrics.Update(candidate.Name, freeMemoryMB, time.Now().Unix())
+
 	}
 	return candidate
 }
@@ -140,6 +146,14 @@ func (b *ArchitectureAwareBalancer) AddTarget(t *middleware.ProxyTarget) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	nodeInfo := registration.GetSingleNeighborInfo(t.Name)
+	// Every time we add a node, we set the information about its available memory
+	if nodeInfo != nil {
+		freeMemoryMB := nodeInfo.TotalMemory - nodeInfo.UsedMemory
+		// Update will update the freeMemory only if the information in nodeInfo is fresher than what we
+		// already have in the NodeMetrics cache.
+		NodeMetrics.Update(t.Name, freeMemoryMB, nodeInfo.LastUpdateTime)
+	}
 	// Decide if target belongs to ARM or x86
 	if t.Meta["arch"] == container.ARM {
 		b.armRing.Add(t)
@@ -154,6 +168,8 @@ func (b *ArchitectureAwareBalancer) AddTarget(t *middleware.ProxyTarget) bool {
 func (b *ArchitectureAwareBalancer) RemoveTarget(name string) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	delete(NodeMetrics.metrics, name) // this is no longer needed
 
 	if b.armRing.RemoveByName(name) {
 		return true

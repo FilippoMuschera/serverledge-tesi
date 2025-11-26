@@ -1,10 +1,13 @@
 package lb
 
 import (
+	"sync"
+
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/serverledge-faas/serverledge/internal/function"
-	"github.com/serverledge-faas/serverledge/internal/registration"
 )
+
+var AllMemoryAvailable = int64(10 ^ 10) // An high value to symbolize all memory is free
 
 // MemoryChecker is the function that checks if the node selected has enough memory to execute the function.
 // it is an interface, and it's put in HashRing to make unit-tests possible by mocking it
@@ -15,17 +18,50 @@ type MemoryChecker interface {
 type DefaultMemoryChecker struct{}
 
 func (m *DefaultMemoryChecker) HasEnoughMemory(candidate *middleware.ProxyTarget, fun *function.Function) bool {
-	nodesInfo := registration.GetFullNeighborInfo()
-	if nodesInfo == nil {
-		return true // if for some reason I have no information on neighbors, then let's just use the first I found.
-		// It still has more chances of a warm start, and I cannot gather information about any node anyway
+	freeMemoryMB := NodeMetrics.GetFreeMemory(candidate.Name)
+	return freeMemoryMB >= fun.MemoryMB
+
+}
+
+var NodeMetrics = &NodeMetricCache{
+	metrics: make(map[string]NodeMetric),
+}
+
+type NodeMetric struct {
+	FreeMemoryMB int64
+	LastUpdate   int64
+}
+
+type NodeMetricCache struct {
+	mu      sync.RWMutex
+	metrics map[string]NodeMetric
+}
+
+func (c *NodeMetricCache) Update(nodeName string, freeMemMB int64, updateTime int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	curr, ok := c.metrics[nodeName]
+	if ok && (updateTime < curr.LastUpdate) {
+		return // if this branch is taken, we do not update. The info we already have is "fresher" than the one we received now
 	}
-	candidateInfo := nodesInfo[candidate.Name] // candidate.Name = NodeRegistration.Key, see lb.go
-	if candidateInfo == nil {
-		return true // not enough information to justify skipping this node
+	c.metrics[nodeName] = NodeMetric{
+		FreeMemoryMB: freeMemMB,
+		LastUpdate:   updateTime,
+	}
+}
+
+func (c *NodeMetricCache) GetFreeMemory(nodeName string) int64 {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	val, ok := c.metrics[nodeName]
+	if !ok {
+		// This can probably only happen in the first phases of execution of Serverledge; we have the list of neighbors
+		// but we haven't completed yet the first polling round for status information. This means the full system has
+		// already started and there should be enough free memory.
+		// Plus, these are cloud nodes, so the total memory should be sufficient to execute any function.
+		return AllMemoryAvailable
 	}
 
-	// UsedMemory refers only to memory used by *running* functions, not memory for warm containers.
-	return candidateInfo.TotalMemory-candidateInfo.UsedMemory >= fun.MemoryMB // true if there is sufficient memory for execution
-
+	return val.FreeMemoryMB
 }
