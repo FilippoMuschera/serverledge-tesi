@@ -84,12 +84,23 @@ func InvokeFunction(c echo.Context) error {
 		defer span.End()
 	}
 
+	setMetricsHeaders := func() {
+		// These headers will be used by the Load Balancer (if there is one), to get fresh updates on the free
+		// memory of each node after the execution of every function.
+		c.Response().Header().Set("Serverledge-Node-Name", node.LocalNode.Key)
+
+		freeMem := node.LocalResources.AvailableMemory()
+		c.Response().Header().Set("Serverledge-Free-Mem", fmt.Sprintf("%d", freeMem))
+	}
+
 	if r.Async {
 		go scheduling.SubmitAsyncRequest(r)
+		setMetricsHeaders()
 		return c.JSON(http.StatusOK, function.AsyncResponse{ReqId: r.Id()})
 	}
 
 	executionReport, err := scheduling.SubmitRequest(r)
+	setMetricsHeaders() // after the execution the memory used by this node doesn't include anymore the memory used by the function
 
 	if errors.Is(err, node.OutOfResourcesErr) {
 		return c.String(http.StatusTooManyRequests, "")
