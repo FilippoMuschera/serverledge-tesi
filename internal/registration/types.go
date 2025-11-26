@@ -26,4 +26,5 @@ type StatusInformation struct {
 	UsedCPU                 float64
 	Coordinates             vivaldi.Coordinate
 	LoadAvg                 []float64
+	LastUpdateTime          int64 // timestamp of last update of this information
 }
