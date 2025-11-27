@@ -1,13 +1,14 @@
 package lb
 
 import (
+	"log"
 	"sync"
 
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/serverledge-faas/serverledge/internal/function"
 )
 
-var AllMemoryAvailable = int64(10 ^ 10) // An high value to symbolize all memory is free
+var AllMemoryAvailable = int64(10_000_000) // A high value to symbolize all memory is free
 
 // MemoryChecker is the function that checks if the node selected has enough memory to execute the function.
 // it is an interface, and it's put in HashRing to make unit-tests possible by mocking it
@@ -19,6 +20,7 @@ type DefaultMemoryChecker struct{}
 
 func (m *DefaultMemoryChecker) HasEnoughMemory(candidate *middleware.ProxyTarget, fun *function.Function) bool {
 	freeMemoryMB := NodeMetrics.GetFreeMemory(candidate.Name)
+	log.Printf("Candidate has: %d MB free memory. Function needs: %d MB", freeMemoryMB, fun.MemoryMB)
 	return freeMemoryMB >= fun.MemoryMB
 
 }
