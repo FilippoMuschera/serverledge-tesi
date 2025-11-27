@@ -21,8 +21,8 @@ func TestContainerPool(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 	// creating inc and double functions
-	funcs := []string{"inc", "double"}
-	for _, name := range funcs {
+	pyFuncs := []string{"inc", "double"}
+	for _, name := range pyFuncs {
 		fn, err := InitializePyFunction(name, "handler", function.NewSignature().
 			AddInput("input", function.Int{}).
 			AddOutput("result", function.Int{}).
@@ -31,11 +31,20 @@ func TestContainerPool(t *testing.T) {
 
 		createApiIfNotExistsTest(t, fn, HOST, PORT)
 	}
+
+	// creating java function
+	javaFn, err := InitializeJavaFunction("hello-java", "com.test.HelloFunction", function.NewSignature().
+		AddInput("name", function.Text{}).
+		AddOutput("greeting", function.Text{}).
+		Build())
+	utils.AssertNil(t, err)
+	createApiIfNotExistsTest(t, javaFn, HOST, PORT)
+
 	// executing all functions
 	channel := make(chan error)
 	const n = 3
 	for i := 0; i < n; i++ {
-		for _, name := range funcs {
+		for _, name := range pyFuncs {
 			x := make(map[string]interface{})
 			x["input"] = 1
 			fnName := name
@@ -45,17 +54,26 @@ func TestContainerPool(t *testing.T) {
 				channel <- err
 			}()
 		}
+		// invoke java func
+		x := make(map[string]interface{})
+		x["name"] = "World"
+		go func() {
+			time.Sleep(5 * time.Second)
+			err := invokeApiTest(javaFn.Name, x, HOST, PORT)
+			channel <- err
+		}()
 	}
 
 	// wait for all functions to complete and checking the errors
-	for i := 0; i < len(funcs)*n; i++ {
+	for i := 0; i < (len(pyFuncs)+1)*n; i++ {
 		err := <-channel
 		utils.AssertNil(t, err)
 	}
 	// delete each function
-	for _, name := range funcs {
+	for _, name := range pyFuncs {
 		deleteApiTest(t, name, HOST, PORT)
 	}
+	deleteApiTest(t, javaFn.Name, HOST, PORT)
 	//utils.AssertTrueMsg(t, workflow.IsEmptyPartialDataCache(), "partial data cache is not empty")
 }
 
