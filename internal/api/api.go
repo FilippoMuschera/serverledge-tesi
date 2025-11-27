@@ -49,6 +49,7 @@ func GetFunctions(c echo.Context) error {
 
 // InvokeFunction handles a function invocation request.
 func InvokeFunction(c echo.Context) error {
+	log.Printf("Before exec -> Available memory: %d\n", node.LocalResources.AvailableMemory())
 	funcName := c.Param("fun")
 	fun, ok := function.GetFunction(funcName)
 	if !ok {
@@ -84,23 +85,27 @@ func InvokeFunction(c echo.Context) error {
 		defer span.End()
 	}
 
-	setMetricsHeaders := func() {
+	setMetricsHeaders := func(freeMem int64) {
 		// These headers will be used by the Load Balancer (if there is one), to get fresh updates on the free
 		// memory of each node after the execution of every function.
 		c.Response().Header().Set("Serverledge-Node-Name", node.LocalNode.Key)
 
-		freeMem := node.LocalResources.AvailableMemory()
 		c.Response().Header().Set("Serverledge-Free-Mem", fmt.Sprintf("%d", freeMem))
 	}
 
 	if r.Async {
 		go scheduling.SubmitAsyncRequest(r)
-		setMetricsHeaders()
+		setMetricsHeaders(node.LocalResources.AvailableMemory())
 		return c.JSON(http.StatusOK, function.AsyncResponse{ReqId: r.Id()})
 	}
 
 	executionReport, err := scheduling.SubmitRequest(r)
-	setMetricsHeaders() // after the execution the memory used by this node doesn't include anymore the memory used by the function
+	freeMemoryAfterExec := node.LocalResources.AvailableMemory()
+	if executionReport != nil {
+		freeMemoryAfterExec = executionReport.MemAfterExec // updated value
+	}
+	log.Printf("After exec -> Available memory: %d\n", freeMemoryAfterExec)
+	setMetricsHeaders(freeMemoryAfterExec)
 
 	if errors.Is(err, node.OutOfResourcesErr) {
 		return c.String(http.StatusTooManyRequests, "")
