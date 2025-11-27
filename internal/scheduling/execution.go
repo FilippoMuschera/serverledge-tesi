@@ -7,6 +7,7 @@ import (
 
 	"github.com/serverledge-faas/serverledge/internal/container"
 	"github.com/serverledge-faas/serverledge/internal/executor"
+	"github.com/serverledge-faas/serverledge/internal/node"
 )
 
 const HANDLER_DIR = "/app"
@@ -64,6 +65,9 @@ func Execute(cont *container.Container, r *scheduledRequest, isWarm bool) error 
 	r.ResponseTime = time.Now().Sub(r.Arrival).Seconds()
 	// initializing containers may require invocation retries, adding // latency
 	r.InitTime = initTime + invocationWait.Seconds()
+	r.MemAfterExec = node.LocalResources.AvailableMemory() + r.Fun.MemoryMB // the same will be done asynchronously
+	// by the scheduler, but we can't wait for it (increased latency). If we don't wait this is a race condition and
+	// we (almost) never see the update because the scheduler is slower to update the free memory.
 
 	// notify scheduler
 	completions <- &completionNotification{r: r, cont: cont, failed: false}

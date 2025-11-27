@@ -32,6 +32,8 @@ type ExecutionReport struct {
 	OffloadLatency float64 // time spent offloading the request
 	Duration       float64 // execution (service) time
 	Output         string
+	MemAfterExec   int64 `json:"-"` // used to avoid race conditions when using a LB, without having to wait for the scheduler to update
+
 }
 
 type Response struct {
