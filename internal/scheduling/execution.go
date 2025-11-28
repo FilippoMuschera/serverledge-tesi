@@ -65,9 +65,8 @@ func Execute(cont *container.Container, r *scheduledRequest, isWarm bool) error 
 	r.ResponseTime = time.Now().Sub(r.Arrival).Seconds()
 	// initializing containers may require invocation retries, adding // latency
 	r.InitTime = initTime + invocationWait.Seconds()
-	r.MemAfterExec = node.LocalResources.AvailableMemory() + r.Fun.MemoryMB // the same will be done asynchronously
-	// by the scheduler, but we can't wait for it (increased latency). If we don't wait this is a race condition and
-	// we (almost) never see the update because the scheduler is slower to update the free memory.
+
+	node.HandleCompletion(cont, r.Fun)
 
 	// notify scheduler
 	completions <- &completionNotification{r: r, cont: cont, failed: false}

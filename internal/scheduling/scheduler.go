@@ -54,7 +54,6 @@ func Run(p Policy) {
 		case r = <-requests: // receive request
 			go p.OnArrival(r)
 		case c = <-completions:
-			node.HandleCompletion(c.cont, c.r.Fun)
 			p.OnCompletion(c.r.Fun, c.r.ExecutionReport)
 
 			if metrics.Enabled && !c.failed && c.r.ExecutionReport != nil {
