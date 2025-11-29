@@ -12,7 +12,6 @@ import (
 	"github.com/serverledge-faas/serverledge/internal/config"
 	"github.com/serverledge-faas/serverledge/internal/container"
 	"github.com/serverledge-faas/serverledge/internal/function"
-	"github.com/serverledge-faas/serverledge/internal/registration"
 )
 
 type ArchitectureAwareBalancer struct {
@@ -146,7 +145,7 @@ func (b *ArchitectureAwareBalancer) AddTarget(t *middleware.ProxyTarget) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	nodeInfo := registration.GetSingleNeighborInfo(t.Name)
+	nodeInfo := GetSingleTargetInfo(t)
 	// Every time we add a node, we set the information about its available memory
 	if nodeInfo != nil {
 		freeMemoryMB := nodeInfo.TotalMemory - nodeInfo.UsedMemory

@@ -1,6 +1,7 @@
 package lb
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -97,8 +98,10 @@ func getTargets(region string) ([]*middleware.ProxyTarget, error) {
 }
 
 func updateTargets(balancer middleware.ProxyBalancer, region string) {
+	var sleepTime = config.GetInt(config.LB_REFRESH_INTERVAL, 30)
 	for {
-		time.Sleep(30 * time.Second) // TODO: configure
+		time.Sleep(time.Duration(sleepTime) * time.Second)
+		log.Printf("[LB]: Periodic targets update\n")
 
 		targets, err := getTargets(region)
 		if err != nil {
@@ -116,6 +119,13 @@ func updateTargets(balancer middleware.ProxyBalancer, region string) {
 				if curr.Name == t.Name {
 					toKeep[i] = true
 					toAdd = false
+					// Since we're keeping this node, we'll update it's free memory info.
+					nodeInfo := GetSingleTargetInfo(curr)
+					if nodeInfo != nil {
+						freeMemoryMB := nodeInfo.TotalMemory - nodeInfo.UsedMemory
+						NodeMetrics.Update(curr.Name, freeMemoryMB, nodeInfo.LastUpdateTime)
+					}
+
 				}
 			}
 			if toAdd {
@@ -131,7 +141,7 @@ func updateTargets(balancer middleware.ProxyBalancer, region string) {
 				toRemove = append(toRemove, curr.Name)
 			} else {
 				// If we keep this node, then we'll update its info about free memory
-				nodeInfo := registration.GetSingleNeighborInfo(curr.Name)
+				nodeInfo := GetSingleTargetInfo(curr)
 				if nodeInfo != nil {
 					freeMemoryMB := nodeInfo.TotalMemory - nodeInfo.UsedMemory
 					NodeMetrics.Update(curr.Name, freeMemoryMB, nodeInfo.LastUpdateTime)
@@ -144,4 +154,27 @@ func updateTargets(balancer middleware.ProxyBalancer, region string) {
 
 		currentTargets = targets
 	}
+}
+
+func GetSingleTargetInfo(target *middleware.ProxyTarget) *registration.StatusInformation {
+
+	// Build the status URL and GET request to the target (not using UDP best-effort implementation)
+	targetUrl := fmt.Sprintf("%s/status", target.URL)
+
+	resp, err := http.Get(targetUrl)
+	if err != nil {
+		log.Printf("Failed to get status from target %s: %v", target.Name, err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	// Decode the JSON response to obtain the StatusInfo data structure
+	var statusInfo registration.StatusInformation
+	err = json.NewDecoder(resp.Body).Decode(&statusInfo)
+	if err != nil {
+		log.Printf("Failed to decode status response from target %s: %v", target.Name, err)
+		return nil
+	}
+
+	return &statusInfo
 }

@@ -279,6 +279,7 @@ func GetServerStatus(c echo.Context) error {
 		UsedCPU:                 node.LocalResources.UsedCPUs(),
 		Coordinates:             *registration.VivaldiClient.GetCoordinate(),
 		LoadAvg:                 loadAvgValues,
+		LastUpdateTime:          time.Now().Unix(),
 	}
 
 	return c.JSON(http.StatusOK, response)
