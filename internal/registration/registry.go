@@ -444,14 +444,3 @@ func GetFullNeighborInfo() map[string]*StatusInformation {
 	defer mutex.RUnlock()
 	return maps.Clone(neighborInfo)
 }
-
-func GetSingleNeighborInfo(key string) *StatusInformation {
-	mutex.RLock()
-	defer mutex.RUnlock()
-	info, ok := neighborInfo[key]
-	if !ok {
-		return nil
-	}
-	return info
-
-}
