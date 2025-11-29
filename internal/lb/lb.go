@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -166,7 +167,12 @@ func GetSingleTargetInfo(target *middleware.ProxyTarget) *registration.StatusInf
 		log.Printf("Failed to get status from target %s: %v", target.Name, err)
 		return nil
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("Failed to close response body: %v", err)
+		}
+	}(resp.Body)
 
 	// Decode the JSON response to obtain the StatusInfo data structure
 	var statusInfo registration.StatusInformation
