@@ -53,6 +53,9 @@ const REG_MONITORING_INTERVAL = "registry.monitoring.interval"
 // ArchitectureAwareLb: number of replicas in the HashRing for each physical node
 const REPLICAS = "lb.replicas"
 
+// LoadBalancer refresh interval (in seconds)
+const LB_REFRESH_INTERVAL = "lb.refresh_interval"
+
 // port for udp status listener
 const LISTEN_UDP_PORT = "registry.udp.port"
 
