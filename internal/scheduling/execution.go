@@ -7,6 +7,7 @@ import (
 
 	"github.com/serverledge-faas/serverledge/internal/container"
 	"github.com/serverledge-faas/serverledge/internal/executor"
+	"github.com/serverledge-faas/serverledge/internal/node"
 )
 
 const HANDLER_DIR = "/app"
@@ -64,6 +65,8 @@ func Execute(cont *container.Container, r *scheduledRequest, isWarm bool) error 
 	r.ResponseTime = time.Now().Sub(r.Arrival).Seconds()
 	// initializing containers may require invocation retries, adding // latency
 	r.InitTime = initTime + invocationWait.Seconds()
+
+	node.HandleCompletion(cont, r.Fun)
 
 	// notify scheduler
 	completions <- &completionNotification{r: r, cont: cont, failed: false}

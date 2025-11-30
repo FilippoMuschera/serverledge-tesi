@@ -401,6 +401,7 @@ func nearbyMonitoring(vivaldiClient *vivaldi.Client) {
 
 		mutex.Lock()
 		neighborInfo[registeredNode.Key] = newInfo
+		neighborInfo[registeredNode.Key].LastUpdateTime = time.Now().Unix()
 
 		_, err := vivaldiClient.Update("node", &newInfo.Coordinates, rtt)
 		if err != nil {

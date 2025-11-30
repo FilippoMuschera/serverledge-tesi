@@ -1,12 +1,15 @@
 package lb
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -32,8 +35,38 @@ func StartReverseProxy(e *echo.Echo, region string) {
 	log.Printf("Initializing with %d targets.\n", len(targets))
 	balancer := newBalancer(targets)
 	currentTargets = targets
-	e.Use(middleware.Proxy(balancer))
 
+	// Custom ProxyConfig to process custom headers and update available memory of each targets after they
+	// executed a function.
+	// These headers are set after the execution of the function on the target node, so the free memory already
+	// includes the memory freed by the function, once it's executed.
+	proxyConfig := middleware.ProxyConfig{
+		Balancer: balancer,
+
+		// We use ModifyResponse to process these headers
+		ModifyResponse: func(res *http.Response) error {
+
+			nodeName := res.Header.Get("Serverledge-Node-Name")
+			freeMemStr := res.Header.Get("Serverledge-Free-Mem")
+
+			if nodeName != "" && freeMemStr != "" {
+				freeMem, err := strconv.ParseInt(freeMemStr, 10, 64)
+				if err == nil {
+					NodeMetrics.Update(nodeName, freeMem, time.Now().Unix())
+
+					log.Printf("[LB-Update] Node %s reported %d MB free", nodeName, freeMem)
+				}
+			}
+
+			// Remove the no-longer-needed headers
+			res.Header.Del("Serverledge-Node-Name")
+			res.Header.Del("Serverledge-Free-Mem")
+
+			return nil
+		},
+	}
+
+	e.Use(middleware.ProxyWithConfig(proxyConfig))
 	go updateTargets(balancer, region)
 
 	portNumber := config.GetInt(config.API_PORT, 1323)
@@ -66,12 +99,15 @@ func getTargets(region string) ([]*middleware.ProxyTarget, error) {
 }
 
 func updateTargets(balancer middleware.ProxyBalancer, region string) {
+	var sleepTime = config.GetInt(config.LB_REFRESH_INTERVAL, 30)
 	for {
-		time.Sleep(30 * time.Second) // TODO: configure
+		time.Sleep(time.Duration(sleepTime) * time.Second)
+		log.Printf("[LB]: Periodic targets update\n")
 
 		targets, err := getTargets(region)
 		if err != nil {
 			log.Printf("Cannot update targets: %v\n", err)
+			continue // otherwise we update everything with a nil target array, removing all targets from the LB list!
 		}
 
 		toKeep := make([]bool, len(currentTargets))
@@ -84,6 +120,13 @@ func updateTargets(balancer middleware.ProxyBalancer, region string) {
 				if curr.Name == t.Name {
 					toKeep[i] = true
 					toAdd = false
+					// Since we're keeping this node, we'll update it's free memory info.
+					nodeInfo := GetSingleTargetInfo(curr)
+					if nodeInfo != nil {
+						freeMemoryMB := nodeInfo.TotalMemory - nodeInfo.UsedMemory
+						NodeMetrics.Update(curr.Name, freeMemoryMB, nodeInfo.LastUpdateTime)
+					}
+
 				}
 			}
 			if toAdd {
@@ -97,6 +140,13 @@ func updateTargets(balancer middleware.ProxyBalancer, region string) {
 			if !toKeep[i] {
 				log.Printf("Removing %s\n", curr.Name)
 				toRemove = append(toRemove, curr.Name)
+			} else {
+				// If we keep this node, then we'll update its info about free memory
+				nodeInfo := GetSingleTargetInfo(curr)
+				if nodeInfo != nil {
+					freeMemoryMB := nodeInfo.TotalMemory - nodeInfo.UsedMemory
+					NodeMetrics.Update(curr.Name, freeMemoryMB, nodeInfo.LastUpdateTime)
+				}
 			}
 		}
 		for _, curr := range toRemove {
@@ -105,4 +155,32 @@ func updateTargets(balancer middleware.ProxyBalancer, region string) {
 
 		currentTargets = targets
 	}
+}
+
+func GetSingleTargetInfo(target *middleware.ProxyTarget) *registration.StatusInformation {
+
+	// Build the status URL and GET request to the target (not using UDP best-effort implementation)
+	targetUrl := fmt.Sprintf("%s/status", target.URL)
+
+	resp, err := http.Get(targetUrl)
+	if err != nil {
+		log.Printf("Failed to get status from target %s: %v", target.Name, err)
+		return nil
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("Failed to close response body: %v", err)
+		}
+	}(resp.Body)
+
+	// Decode the JSON response to obtain the StatusInfo data structure
+	var statusInfo registration.StatusInformation
+	err = json.NewDecoder(resp.Body).Decode(&statusInfo)
+	if err != nil {
+		log.Printf("Failed to decode status response from target %s: %v", target.Name, err)
+		return nil
+	}
+
+	return &statusInfo
 }

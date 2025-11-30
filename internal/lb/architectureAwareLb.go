@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -38,10 +39,8 @@ func NewArchitectureAwareBalancer(targets []*middleware.ProxyTarget) *Architectu
 	// both ARM and x86. We will now sort them into the respective hashRings.
 	for _, t := range targets {
 		arch := t.Meta["arch"]
-		if arch == container.ARM {
-			b.armRing.Add(t)
-		} else if arch == container.X86 {
-			b.x86Ring.Add(t)
+		if arch == container.ARM || arch == container.X86 {
+			b.AddTarget(t)
 		} else {
 			log.Printf("Unknown architecture for node %s\n", t.Name)
 		}
@@ -83,6 +82,12 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 			candidate = b.armRing.Get(fun)
 		}
 	}
+	if candidate != nil {
+		freeMemoryMB := NodeMetrics.GetFreeMemory(candidate.Name) - fun.MemoryMB
+		// Remove the memory that this function will use (this will then be updated again once the function is executed)
+		NodeMetrics.Update(candidate.Name, freeMemoryMB, time.Now().Unix())
+
+	}
 	return candidate
 }
 
@@ -105,17 +110,43 @@ func (b *ArchitectureAwareBalancer) selectArchitecture(fun *function.Function) (
 	supportsArm := fun.SupportsArch(container.ARM)
 	supportsX86 := fun.SupportsArch(container.X86)
 
-	//TODO implement a better tie-breaking strategy
-
-	// Tie-breaking: if both architectures are supported, prefer ARM if available (less energy consumption), otherwise x86.
 	if supportsArm && supportsX86 {
+		cacheValidity := 30 * time.Second // may be fine-tuned
+		cacheEntry, ok := ArchitectureCacheLB.cache[fun.Name]
+
+		// If we have a valid cache entry, we try to use it
+		expiry := time.Unix(cacheEntry.Timestamp, 0).Add(cacheValidity)
+		if ok && time.Now().Before(expiry) {
+			// Check if the cached architecture has available nodes
+			if (cacheEntry.Arch == container.ARM && b.armRing.Size() > 0) ||
+				(cacheEntry.Arch == container.X86 && b.x86Ring.Size() > 0) {
+				// If the cached architecture is still valid and has available nodes, use it
+				cacheEntry.Timestamp = time.Now().Unix() // Update timestamp
+				ArchitectureCacheLB.cache[fun.Name] = cacheEntry
+				return cacheEntry.Arch, nil
+			}
+
+		}
+
+		// Tie-breaking: if both architectures are supported, prefer ARM if available (less energy consumption), otherwise x86.
+		// This will also be the fallback if the cached decision is not usable.
+		var chosenArch string
 		if b.armRing.Size() > 0 {
-			return container.ARM, nil
+			chosenArch = container.ARM
+		} else if b.x86Ring.Size() > 0 {
+			chosenArch = container.X86
+		} else {
+			return "", fmt.Errorf("no available nodes for either ARM or x86")
 		}
-		if b.x86Ring.Size() > 0 {
-			return container.X86, nil
+
+		// Update cache
+		newCacheEntry := ArchitectureCacheEntry{
+			Arch:      chosenArch,
+			Timestamp: time.Now().Unix(),
 		}
-		return "", fmt.Errorf("no available nodes for either ARM or x86")
+		ArchitectureCacheLB.cache[fun.Name] = newCacheEntry
+
+		return chosenArch, nil
 	}
 
 	if supportsArm {
@@ -140,6 +171,14 @@ func (b *ArchitectureAwareBalancer) AddTarget(t *middleware.ProxyTarget) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	nodeInfo := GetSingleTargetInfo(t)
+	// Every time we add a node, we set the information about its available memory
+	if nodeInfo != nil {
+		freeMemoryMB := nodeInfo.TotalMemory - nodeInfo.UsedMemory
+		// Update will update the freeMemory only if the information in nodeInfo is fresher than what we
+		// already have in the NodeMetrics cache.
+		NodeMetrics.Update(t.Name, freeMemoryMB, nodeInfo.LastUpdateTime)
+	}
 	// Decide if target belongs to ARM or x86
 	if t.Meta["arch"] == container.ARM {
 		b.armRing.Add(t)
@@ -154,6 +193,8 @@ func (b *ArchitectureAwareBalancer) AddTarget(t *middleware.ProxyTarget) bool {
 func (b *ArchitectureAwareBalancer) RemoveTarget(name string) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	delete(NodeMetrics.metrics, name) // this is no longer needed
 
 	if b.armRing.RemoveByName(name) {
 		return true
