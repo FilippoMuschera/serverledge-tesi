@@ -20,6 +20,12 @@ type ArchitectureAwareBalancer struct {
 	// instead of classic lists we will use hashRings (see hashRing.go) to implement a consistent hashing technique
 	armRing *HashRing
 	x86Ring *HashRing
+
+	// This map will cache the architecture chosen previously to try and maximize the use of warm containers of targets
+	bothArchsDecisionCache map[string]struct {
+		Arch      string
+		Timestamp int64
+	}
 }
 
 // NewArchitectureAwareBalancer Constructor
@@ -33,6 +39,10 @@ func NewArchitectureAwareBalancer(targets []*middleware.ProxyTarget) *Architectu
 	b := &ArchitectureAwareBalancer{
 		armRing: NewHashRing(REPLICAS),
 		x86Ring: NewHashRing(REPLICAS),
+		bothArchsDecisionCache: make(map[string]struct {
+			Arch      string
+			Timestamp int64
+		}),
 	}
 
 	// to stay consistent with the old RoundRobinLoadBalancer, we'll still a single target list, that will contain all nodes,
@@ -110,17 +120,40 @@ func (b *ArchitectureAwareBalancer) selectArchitecture(fun *function.Function) (
 	supportsArm := fun.SupportsArch(container.ARM)
 	supportsX86 := fun.SupportsArch(container.X86)
 
-	//TODO implement a better tie-breaking strategy
-
-	// Tie-breaking: if both architectures are supported, prefer ARM if available (less energy consumption), otherwise x86.
 	if supportsArm && supportsX86 {
+		cacheValidity := 15 * time.Second // may be fine-tuned
+		value, ok := b.bothArchsDecisionCache[fun.Name]
+
+		// If we have a valid cache entry, we try to use it
+		expiry := time.Unix(value.Timestamp, 0).Add(cacheValidity)
+		if ok && time.Now().Before(expiry) {
+			// Check if the cached architecture has available nodes
+			if value.Arch == container.ARM && b.armRing.Size() > 0 {
+				return container.ARM, nil
+			}
+			if value.Arch == container.X86 && b.x86Ring.Size() > 0 {
+				return container.X86, nil
+			}
+		}
+
+		// Tie-breaking: if both architectures are supported, prefer ARM if available (less energy consumption), otherwise x86.
+		// This will also be the fallback if the cached decision is not usable.
+		var chosenArch string
 		if b.armRing.Size() > 0 {
-			return container.ARM, nil
+			chosenArch = container.ARM
+		} else if b.x86Ring.Size() > 0 {
+			chosenArch = container.X86
+		} else {
+			return "", fmt.Errorf("no available nodes for either ARM or x86")
 		}
-		if b.x86Ring.Size() > 0 {
-			return container.X86, nil
-		}
-		return "", fmt.Errorf("no available nodes for either ARM or x86")
+
+		// Update cache
+		b.bothArchsDecisionCache[fun.Name] = struct {
+			Arch      string
+			Timestamp int64
+		}{Arch: chosenArch, Timestamp: time.Now().Unix()}
+
+		return chosenArch, nil
 	}
 
 	if supportsArm {
