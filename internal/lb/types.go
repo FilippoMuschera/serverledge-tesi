@@ -29,6 +29,11 @@ var NodeMetrics = &NodeMetricCache{
 	metrics: make(map[string]NodeMetric),
 }
 
+// This map will cache the architecture chosen previously to try and maximize the use of warm containers of targets
+var ArchitectureCacheLB = &ArchitectureCache{
+	cache: make(map[string]ArchitectureCacheEntry),
+}
+
 type NodeMetric struct {
 	FreeMemoryMB int64
 	LastUpdate   int64
@@ -37,6 +42,16 @@ type NodeMetric struct {
 type NodeMetricCache struct {
 	mu      sync.RWMutex
 	metrics map[string]NodeMetric
+}
+
+type ArchitectureCacheEntry struct {
+	Arch      string
+	Timestamp int64
+}
+
+type ArchitectureCache struct {
+	mu    sync.RWMutex
+	cache map[string]ArchitectureCacheEntry
 }
 
 func (c *NodeMetricCache) Update(nodeName string, freeMemMB int64, updateTime int64) {

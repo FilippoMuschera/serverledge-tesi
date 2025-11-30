@@ -20,12 +20,6 @@ type ArchitectureAwareBalancer struct {
 	// instead of classic lists we will use hashRings (see hashRing.go) to implement a consistent hashing technique
 	armRing *HashRing
 	x86Ring *HashRing
-
-	// This map will cache the architecture chosen previously to try and maximize the use of warm containers of targets
-	bothArchsDecisionCache map[string]struct {
-		Arch      string
-		Timestamp int64
-	}
 }
 
 // NewArchitectureAwareBalancer Constructor
@@ -39,10 +33,6 @@ func NewArchitectureAwareBalancer(targets []*middleware.ProxyTarget) *Architectu
 	b := &ArchitectureAwareBalancer{
 		armRing: NewHashRing(REPLICAS),
 		x86Ring: NewHashRing(REPLICAS),
-		bothArchsDecisionCache: make(map[string]struct {
-			Arch      string
-			Timestamp int64
-		}),
 	}
 
 	// to stay consistent with the old RoundRobinLoadBalancer, we'll still a single target list, that will contain all nodes,
@@ -121,19 +111,21 @@ func (b *ArchitectureAwareBalancer) selectArchitecture(fun *function.Function) (
 	supportsX86 := fun.SupportsArch(container.X86)
 
 	if supportsArm && supportsX86 {
-		cacheValidity := 15 * time.Second // may be fine-tuned
-		value, ok := b.bothArchsDecisionCache[fun.Name]
+		cacheValidity := 30 * time.Second // may be fine-tuned
+		cacheEntry, ok := ArchitectureCacheLB.cache[fun.Name]
 
 		// If we have a valid cache entry, we try to use it
-		expiry := time.Unix(value.Timestamp, 0).Add(cacheValidity)
+		expiry := time.Unix(cacheEntry.Timestamp, 0).Add(cacheValidity)
 		if ok && time.Now().Before(expiry) {
 			// Check if the cached architecture has available nodes
-			if value.Arch == container.ARM && b.armRing.Size() > 0 {
-				return container.ARM, nil
+			if (cacheEntry.Arch == container.ARM && b.armRing.Size() > 0) ||
+				(cacheEntry.Arch == container.X86 && b.x86Ring.Size() > 0) {
+				// If the cached architecture is still valid and has available nodes, use it
+				cacheEntry.Timestamp = time.Now().Unix() // Update timestamp
+				ArchitectureCacheLB.cache[fun.Name] = cacheEntry
+				return cacheEntry.Arch, nil
 			}
-			if value.Arch == container.X86 && b.x86Ring.Size() > 0 {
-				return container.X86, nil
-			}
+
 		}
 
 		// Tie-breaking: if both architectures are supported, prefer ARM if available (less energy consumption), otherwise x86.
@@ -148,10 +140,11 @@ func (b *ArchitectureAwareBalancer) selectArchitecture(fun *function.Function) (
 		}
 
 		// Update cache
-		b.bothArchsDecisionCache[fun.Name] = struct {
-			Arch      string
-			Timestamp int64
-		}{Arch: chosenArch, Timestamp: time.Now().Unix()}
+		newCacheEntry := ArchitectureCacheEntry{
+			Arch:      chosenArch,
+			Timestamp: time.Now().Unix(),
+		}
+		ArchitectureCacheLB.cache[fun.Name] = newCacheEntry
 
 		return chosenArch, nil
 	}
