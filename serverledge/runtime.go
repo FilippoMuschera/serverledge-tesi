@@ -40,6 +40,7 @@ func executeWithCapture(handler HandlerFunc, params map[string]interface{}) exec
 
 	os.Stdout = w
 	os.Stderr = w
+	log.SetOutput(w)
 
 	// channel to pass the output to the wrapper
 	outC := make(chan string)
@@ -61,6 +62,7 @@ func executeWithCapture(handler HandlerFunc, params map[string]interface{}) exec
 			_ = w.Close()
 			os.Stdout = oldStdout
 			os.Stderr = oldStderr
+			log.SetOutput(oldStderr)
 		}()
 		res, err = handler(params) // actual execution of the handler
 	}()
