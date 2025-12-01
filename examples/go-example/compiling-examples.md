@@ -24,7 +24,7 @@ zip -j function.zip handler_amd64 handler_arm64
 bin/serverledge-cli create \
   -f gofunc \
   --memory 300 \
-  --src examples/go-function.zip \
+  --src examples/go-example/go-function.zip \
   --runtime go125
 
 # and then execute it
