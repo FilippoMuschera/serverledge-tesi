@@ -34,6 +34,7 @@ func executeWithCapture(handler HandlerFunc, params map[string]interface{}) exec
 	// old values to be restored after execution
 	oldStdout := os.Stdout
 	oldStderr := os.Stderr
+	oldLog := log.Writer()
 
 	// pipe used to read the stdout/err
 	r, w, _ := os.Pipe()
@@ -62,7 +63,7 @@ func executeWithCapture(handler HandlerFunc, params map[string]interface{}) exec
 			_ = w.Close()
 			os.Stdout = oldStdout
 			os.Stderr = oldStderr
-			log.SetOutput(oldStderr)
+			log.SetOutput(oldLog)
 		}()
 		res, err = handler(params) // actual execution of the handler
 	}()
