@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -326,10 +327,19 @@ func create(cmd *cobra.Command, args []string) {
 
 	var encoded string
 	if runtime != "custom" {
-		srcContent, err := ReadSourcesAsTar(src)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(3)
+		var srcContent []byte
+		u, err := url.ParseRequestURI(src)
+		fmt.Println(u)
+		if err == nil && u.Scheme != "" && u.Host != "" {
+			// src is a URL
+			srcContent = []byte(src)
+		} else {
+			// src is a folder; a tar has to be created to be uploaded to etcd
+			srcContent, err = ReadSourcesAsTar(src)
+			if err != nil {
+				fmt.Printf("%v\n", err)
+				os.Exit(3)
+			}
 		}
 		encoded = base64.StdEncoding.EncodeToString(srcContent)
 	} else {
