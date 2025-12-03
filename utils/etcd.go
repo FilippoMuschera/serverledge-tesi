@@ -24,12 +24,9 @@ func GetEtcdClient() (*clientv3.Client, error) {
 
 	log.Println("Connecting to etcd")
 	etcdHost := config.GetString(config.ETCD_ADDRESS, "localhost:2379")
-	msgSizeLimit := 50 * 1024 * 1024 // Larger limit for fat jars and fat zip (java and go runtimes)
 	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:          []string{etcdHost},
-		DialTimeout:        3 * time.Second,
-		MaxCallSendMsgSize: msgSizeLimit,
-		MaxCallRecvMsgSize: msgSizeLimit,
+		Endpoints:   []string{etcdHost},
+		DialTimeout: 3 * time.Second,
 	})
 	if err != nil {
 		log.Printf("Could not connect to etcd: %v", err)
