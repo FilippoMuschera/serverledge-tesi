@@ -2,23 +2,30 @@ package node
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"testing"
 
 	"github.com/serverledge-faas/serverledge/internal/function"
 )
 
 func init() {
+
+	log.SetOutput(io.Discard) // otherwise too many log messages and the outcome of the benchmark is lost inside the logs
+
 	if LocalResources.containerPools == nil {
 		LocalResources.containerPools = make(map[string]*ContainerPool)
 	}
 	// Mock resources to simulate the allocation of many containers without problems
 	LocalResources.usedCPUs = 0
+	LocalResources.totalCPUs = 512
+	LocalResources.totalMemory = 20480
 
 }
 
 // benchmark moving a container from busy to idle
 func BenchmarkPoolCycle(b *testing.B) {
-	f := &function.Function{Name: "bench_cycle", MemoryMB: 1, CPUDemand: 0.0000000000001}
+	f := &function.Function{Name: "bench_cycle", MemoryMB: 1, CPUDemand: 0.0001}
 
 	// Scenarios:
 	// 1: Empty pool (only 1 container running) -> Best case for lists
