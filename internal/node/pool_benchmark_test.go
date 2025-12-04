@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"testing"
+	"time"
 
 	"github.com/serverledge-faas/serverledge/internal/function"
 )
@@ -53,6 +54,35 @@ func BenchmarkPoolCycle(b *testing.B) {
 				}
 
 				HandleCompletion(c, f)
+			}
+		})
+	}
+}
+
+func BenchmarkJanitorScan(b *testing.B) {
+	f := &function.Function{Name: "bench_janitor", MemoryMB: 1, CPUDemand: 0}
+	poolSizes := []int{100, 1000, 5000}
+
+	for _, size := range poolSizes {
+		testName := fmt.Sprintf("IdleSize-%d", size)
+		b.Run(testName, func(b *testing.B) {
+			b.StopTimer()
+			fp := resetPool(f)
+
+			// Iniettiamo container
+			conts := injectIdleContainers(fp, size)
+
+			// we don't want to actually destroy the containers (more overhead by docker + we'd need to actually create them)
+			// we simply want to see how fast it is to iterate over the whole lis/slice
+			future := time.Now().Add(1 * time.Hour).UnixNano()
+			for _, c := range conts {
+				c.ExpirationTime = future
+			}
+
+			b.StartTimer()
+
+			for i := 0; i < b.N; i++ {
+				DeleteExpiredContainer()
 			}
 		})
 	}
