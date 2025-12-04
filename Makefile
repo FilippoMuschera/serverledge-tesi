@@ -41,3 +41,10 @@ unit-test:
 clean:
 	@test -n "$(BIN)" && [ -d "$(BIN)" ] && rm -rf $(BIN) || { echo "Invalid BIN directory: $(BIN)"; exit 1; } && go clean -testcache
 
+.PHONY: pool-benchmark
+
+pool-benchmark:
+	@echo "Running ContainerPool Benchmark..."
+	@# Eseguiamo solo il test BenchmarkPoolCycle nel package node
+	@# -benchmem mostra le allocazioni (cruciale per vedere la riduzione GC)
+	go test -v -bench=BenchmarkPoolCycle -benchmem ./internal/node/...
