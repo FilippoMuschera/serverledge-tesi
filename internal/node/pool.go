@@ -223,7 +223,7 @@ func NewContainerWithAcquiredResources(fun *function.Function, startAsIdle bool,
 
 	fp := GetContainerPool(fun)
 	if startAsIdle {
-		fp.idle = append(fp.busy, cont)
+		fp.idle = append(fp.idle, cont)
 	} else {
 		cont.RequestsCount = 1
 		fp.busy = append(fp.busy, cont) // We immediately mark it as busy
@@ -238,6 +238,7 @@ func NewContainerWithAcquiredResourcesAsync(fun *function.Function, okCallback f
 		if err != nil {
 			log.Printf("Failed container creation: %v\n", err)
 			errCallback(err)
+			return
 		}
 
 		LocalResources.Lock()
@@ -320,6 +321,8 @@ cleanup: // Phase 2: Cleanup
 		}
 	} else {
 		log.Printf("Not enough containers to free up at least %d MB (avail to dismiss: %d)", requiredMemoryMB, cleanedMB)
+		return false, errors.New("not enough containers to free up memory")
+
 	}
 	return true, nil
 }
