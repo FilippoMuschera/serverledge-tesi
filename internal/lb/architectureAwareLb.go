@@ -69,8 +69,13 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 			return nil // No suitable node found
 		}
 	*/
-	bandit := mab.GlobalBanditManager.GetBandit(funcName)
-	targetArch := bandit.SelectArm()
+	targetArch := ""
+	if len(fun.SupportedArchs) == 1 { // If only one architecture is supported skip the MAB and just use that
+		targetArch = fun.SupportedArchs[0]
+	} else { // if both are supported, then use the MAB to select it
+		bandit := mab.GlobalBanditManager.GetBandit(funcName)
+		targetArch = bandit.SelectArm()
+	}
 
 	// once we selected an architecture, we'll use consistent hashing to select what node to use
 	// The Get function will cycle through the hashRing to find a suitable node. If none is find we try to check if in
