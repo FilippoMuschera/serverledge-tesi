@@ -1,16 +1,20 @@
 #!/bin/sh
 
-# Automatically determine the primary IP address of this machine
-ETCD_IP=$(hostname -I | awk '{print $1}')
+# Automatically find Internal IP
+INTERNAL_IP=$(hostname -I | awk '{print $1}')
 
-# Check if we got an IP
-if [ -z "$ETCD_IP" ]; then
-    echo "Could not determine local IP address. Please set it manually."
-    # Fallback to a default value if needed, or exit
-    ETCD_IP="127.0.0.1"
+# Find External IP (via Google Cloud metadata server)
+PUBLIC_IP=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
+
+# Fallback if not on GCP or curl fails
+if [ -z "$PUBLIC_IP" ]; then
+    echo "Could not determine Public IP. Using Internal as fallback."
+    PUBLIC_IP=$INTERNAL_IP
 fi
 
-echo "Starting etcd, advertising IP: $ETCD_IP"
+echo "Internal IP: $INTERNAL_IP"
+echo "Public IP:   $PUBLIC_IP"
+
 
 docker run -d \
   -p 2379:2379 \
@@ -21,10 +25,9 @@ docker run -d \
   --name s1 \
   --data-dir /etcd-data \
   --listen-client-urls http://0.0.0.0:2379 \
-  --advertise-client-urls http://${ETCD_IP}:2379 \
+  --advertise-client-urls http://${INTERNAL_IP}:2379,http://${PUBLIC_IP}:2379 \
   --listen-peer-urls http://0.0.0.0:2380 \
-  --initial-advertise-peer-urls http://${ETCD_IP}:2380 \
-  --initial-cluster s1=http://${ETCD_IP}:2380 \
+  --initial-advertise-peer-urls http://${INTERNAL_IP}:2380 \
+  --initial-cluster s1=http://${INTERNAL_IP}:2380 \
   --initial-cluster-token tkn \
-  --initial-cluster-state new \
-  --max-request-bytes 52428800 # To allow fat-zip for go runtime
+  --initial-cluster-state new
