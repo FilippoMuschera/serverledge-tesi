@@ -29,7 +29,7 @@ var NodeMetrics = &NodeMetricCache{
 	metrics: make(map[string]NodeMetric),
 }
 
-// This map will cache the architecture chosen previously to try and maximize the use of warm containers of targets
+// ArchitectureCacheLB This map will cache the architecture chosen previously to try and maximize the use of warm containers of targets
 var ArchitectureCacheLB = &ArchitectureCache{
 	cache: make(map[string]ArchitectureCacheEntry),
 }
