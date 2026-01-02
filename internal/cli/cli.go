@@ -329,9 +329,9 @@ func create(cmd *cobra.Command, args []string) {
 	if runtime != "custom" {
 		var srcContent []byte
 		u, err := url.ParseRequestURI(src)
-		fmt.Println(u)
 		if err == nil && u.Scheme != "" && u.Host != "" {
 			// src is a URL
+			fmt.Println(u)
 			srcContent = []byte(src)
 		} else {
 			// src is a folder; a tar has to be created to be uploaded to etcd
