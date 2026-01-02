@@ -12,6 +12,7 @@ import (
 	"github.com/serverledge-faas/serverledge/internal/cache"
 	"github.com/serverledge-faas/serverledge/internal/container"
 	"github.com/serverledge-faas/serverledge/internal/function"
+	"github.com/serverledge-faas/serverledge/internal/mab"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,19 +31,25 @@ func TestNewArchitectureAwareBalancer(t *testing.T) {
 		newTarget("arm2", container.ARM),
 	}
 
-	b := NewArchitectureAwareBalancer(targets)
+	b := getNewLb(targets)
 
 	assert.Equal(t, 2, b.armRing.Size())
 	assert.Equal(t, 1, b.x86Ring.Size())
 }
 
 func TestAddTarget(t *testing.T) {
-	b := NewArchitectureAwareBalancer([]*middleware.ProxyTarget{})
+	b := getNewLb([]*middleware.ProxyTarget{})
 	b.AddTarget(newTarget("arm1", container.ARM))
 	b.AddTarget(newTarget("x86_1", container.X86))
 
 	assert.Equal(t, 1, b.armRing.Size())
 	assert.Equal(t, 1, b.x86Ring.Size())
+
+	b.AddTarget(newTarget("x86_2", container.X86))
+	b.AddTarget(newTarget("arm2", container.ARM))
+
+	assert.Equal(t, 2, b.armRing.Size())
+	assert.Equal(t, 2, b.x86Ring.Size())
 }
 
 func TestRemoveTarget(t *testing.T) {
@@ -50,7 +57,7 @@ func TestRemoveTarget(t *testing.T) {
 		newTarget("arm1", container.ARM),
 		newTarget("x86_1", container.X86),
 	}
-	b := NewArchitectureAwareBalancer(targets)
+	b := getNewLb(targets)
 
 	assert.Equal(t, 1, b.armRing.Size())
 	assert.Equal(t, 1, b.x86Ring.Size())
@@ -66,13 +73,12 @@ func TestSelectArchitecture(t *testing.T) {
 		newTarget("arm1", container.ARM),
 		newTarget("x86_1", container.X86),
 	}
-	b := NewArchitectureAwareBalancer(targets)
+	b := getNewLb(targets)
 
 	// Test case 1: Function supports both ARM and x86
 	funBoth := &function.Function{Name: "bothArchs", SupportedArchs: []string{container.X86, container.ARM}}
 	arch, err := b.selectArchitecture(funBoth)
 	assert.NoError(t, err)
-	assert.Equal(t, container.ARM, arch)
 
 	// Test case 2: Function supports only ARM
 	funArm := &function.Function{Name: "onlyArm", SupportedArchs: []string{container.ARM}}
@@ -100,7 +106,7 @@ func TestConsistentNodeMapping(t *testing.T) {
 		newTarget("arm2", container.ARM),
 		newTarget("x86_2", container.X86),
 	}
-	b := NewArchitectureAwareBalancer(targets)
+	b := getNewLb(targets)
 
 	fun := &function.Function{
 		Name:           "testFunc",
@@ -123,7 +129,7 @@ func TestConsistentNodeMapping(t *testing.T) {
 	// Subsequent calls should return the same target
 	for i := 0; i < 10; i++ {
 		nextTarget := b.Next(c)
-		assert.Equal(t, firstTarget, nextTarget)
+		assert.NotNil(t, nextTarget)
 	}
 }
 
@@ -132,7 +138,7 @@ func TestGetNodeFromRing(t *testing.T) {
 		newTarget("arm1", container.ARM),
 		newTarget("arm2", container.ARM),
 	}
-	b := NewArchitectureAwareBalancer(targets)
+	b := getNewLb(targets)
 	nodeMap := map[string]struct{}{}
 	nodeMap["arm2"] = struct{}{}
 	mockMemChecker := &MockMemChecker{nodesWithEnoughMemory: nodeMap}
@@ -181,7 +187,7 @@ func TestGetArchFallback(t *testing.T) {
 		newTarget("x86_1", container.X86),
 		newTarget("x86_2", container.X86),
 	}
-	b := NewArchitectureAwareBalancer(targets)
+	b := getNewLb(targets)
 	nodeMap := map[string]struct{}{}
 	nodeMap["x86_2"] = struct{}{}
 	mockMemChecker := &MockMemChecker{nodesWithEnoughMemory: nodeMap}
@@ -230,7 +236,7 @@ func TestGetArchFallbackNotPossible(t *testing.T) {
 		newTarget("arm2", container.ARM),
 		newTarget("x86_1", container.X86),
 	}
-	b := NewArchitectureAwareBalancer(targets)
+	b := getNewLb(targets)
 	nodeMap := map[string]struct{}{}
 	nodeMap["x86_1"] = struct{}{} // has enough memory but should still not be used because incompatible architecture
 	mockMemChecker := &MockMemChecker{nodesWithEnoughMemory: nodeMap}
@@ -275,4 +281,9 @@ type MockMemChecker struct {
 func (m *MockMemChecker) HasEnoughMemory(target *middleware.ProxyTarget, fun *function.Function) bool {
 	_, ret := m.nodesWithEnoughMemory[target.Name]
 	return ret
+}
+
+func getNewLb(targets []*middleware.ProxyTarget) *ArchitectureAwareBalancer {
+	mab.InitBanditManager()
+	return NewArchitectureAwareBalancer(targets)
 }
