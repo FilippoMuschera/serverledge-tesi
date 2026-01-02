@@ -12,6 +12,7 @@ import (
 	"github.com/serverledge-faas/serverledge/internal/config"
 	"github.com/serverledge-faas/serverledge/internal/container"
 	"github.com/serverledge-faas/serverledge/internal/function"
+	"github.com/serverledge-faas/serverledge/internal/mab"
 )
 
 type ArchitectureAwareBalancer struct {
@@ -61,11 +62,15 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 		return nil
 	}
 
-	targetArch, err := b.selectArchitecture(fun) // here the load balancer decides what architecture to use for this function
-	if err != nil {
-		log.Printf("Failed to select a target for function '%s': %v", funcName, err)
-		return nil // No suitable node found
-	}
+	/*
+		targetArch, err := b.selectArchitecture(fun) // here the load balancer decides what architecture to use for this function
+		if err != nil {
+			log.Printf("Failed to select a target for function '%s': %v", funcName, err)
+			return nil // No suitable node found
+		}
+	*/
+	bandit := mab.GlobalBanditManager.GetBandit(funcName)
+	targetArch := bandit.SelectArm()
 
 	// once we selected an architecture, we'll use consistent hashing to select what node to use
 	// The Get function will cycle through the hashRing to find a suitable node. If none is find we try to check if in

@@ -1,6 +1,7 @@
 package lb
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/serverledge-faas/serverledge/internal/config"
+	"github.com/serverledge-faas/serverledge/internal/mab"
 	"github.com/serverledge-faas/serverledge/internal/registration"
 )
 
@@ -46,6 +48,36 @@ func StartReverseProxy(e *echo.Echo, region string) {
 		// We use ModifyResponse to process these headers
 		ModifyResponse: func(res *http.Response) error {
 
+			// Here we read the body, and then we restore it. This is done to avoid a potential race condition:
+			// the main thread of this LB will send the body back to the original user/caller, since it's acting as a
+			// reverse proxy. In the meantime UpdateBandit will try to read the same stream of data to get the
+			// stats about the execution, to update the bandit. Even if the goroutine tries to restore the response after
+			// reading it, chaches are that that won't happen quick eough (and it will not be a reliable solution anyway),
+			// so the solution here is the following:
+			// 1. We read the response body
+			// 2. We extract the fileds needed to update the bandit, and we pass those to UpdateBandit
+			// 3. We restore the response body so that it can be read by the ProxyBalancer in order to send it back to the user.
+			// All of this is because we don't want to call UpdateBandit synchronously, since that would add more
+			// latency for the final user.
+			bodyBytes, err := io.ReadAll(res.Body)
+			if err != nil {
+				return err
+			}
+			_ = res.Body.Close()
+
+			res.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // reset the body, as discussed earlier
+
+			// Extract the necessary data for UpdateBandit
+			nodeArch := res.Header.Get("Serverledge-Node-Arch")
+			reqPath := res.Request.URL.Path
+
+			go func(data []byte, path string, arch string) {
+				err := mab.UpdateBandit(data, path, arch)
+				if err != nil {
+					log.Printf("Failed to update bandit: %v", err)
+				}
+			}(bodyBytes, reqPath, nodeArch)
+
 			nodeName := res.Header.Get("Serverledge-Node-Name")
 			freeMemStr := res.Header.Get("Serverledge-Free-Mem")
 
@@ -61,6 +93,7 @@ func StartReverseProxy(e *echo.Echo, region string) {
 			// Remove the no-longer-needed headers
 			res.Header.Del("Serverledge-Node-Name")
 			res.Header.Del("Serverledge-Free-Mem")
+			res.Header.Del("Serverledge-Node-Arch")
 
 			return nil
 		},
