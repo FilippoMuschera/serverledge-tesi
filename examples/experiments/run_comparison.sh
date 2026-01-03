@@ -13,7 +13,7 @@ echo "============================================="
 
 
 export SERVERLEDGE_POLICY="RoundRobin"
-nohup ./bin/lb lb-config-RR.yaml > lb_rr.log 2>&1 &
+nohup ~/serverledge-tesi/bin/lb lb-config-RR.yaml > lb_rr.log 2>&1 &
 LB_PID=$!
 
 echo "Load Balancer started (PID: $LB_PID). Waiting for initialization..."
@@ -21,7 +21,7 @@ sleep 10
 
 echo "Running Locust for $LOCUST_DURATION..."
 export LB_POLICY="RoundRobin"
-locust -f experiments/locustfile.py \
+locust -f locustfile.py \
     --headless \
     --users $USERS \
     --spawn-rate $SPAWN_RATE \
@@ -49,7 +49,7 @@ echo "STARTING MAB EXPERIMENT"
 echo "============================================="
 
 export SERVERLEDGE_POLICY="MAB"
-nohup ./bin/lb lb-config-MAB.yaml > lb_mab.log 2>&1 &
+nohup ~/serverledge-tesi/bin/lb lb-config-MAB.yaml > lb_mab.log 2>&1 &
 LB_PID=$!
 
 echo "Load Balancer started (PID: $LB_PID). Waiting for initialization..."
@@ -57,7 +57,7 @@ sleep 10
 
 echo "Running Locust for $LOCUST_DURATION..."
 export LB_POLICY="MAB"
-locust -f experiments/locustfile.py \
+locust -f locustfile.py \
     --headless \
     --users $USERS \
     --spawn-rate $SPAWN_RATE \
