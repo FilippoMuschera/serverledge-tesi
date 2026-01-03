@@ -32,6 +32,18 @@ echo "Stopping Load Balancer..."
 kill $LB_PID
 sleep 5
 
+echo ""
+echo "###########################################################"
+echo "#                   OPERATIONAL PAUSE                     #"
+echo "###########################################################"
+echo "Phase 1 has ended."
+echo ""
+echo "NOW REBOOT BOTH X86 AND ARM TARGET NODES"
+echo "Otherwise, the MAB will start with warm containers, and this will mean an uneven comparison"
+echo ""
+read -p "PRESS [ENTER] WHEN YOU ARE READY FOR PHASE 2 (MAB)..."
+echo ""
+
 echo "============================================="
 echo "STARTING MAB EXPERIMENT"
 echo "============================================="
