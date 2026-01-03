@@ -8,6 +8,9 @@ import (
 	"github.com/serverledge-faas/serverledge/internal/function"
 )
 
+const MAB = "MAB"
+const RR = "RoundRobin"
+
 var AllMemoryAvailable = int64(10_000_000) // A high value to symbolize all memory is free
 
 // MemoryChecker is the function that checks if the node selected has enough memory to execute the function.

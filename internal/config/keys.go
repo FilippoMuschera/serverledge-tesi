@@ -56,6 +56,9 @@ const REPLICAS = "lb.replicas"
 // LoadBalancer refresh interval (in seconds)
 const LB_REFRESH_INTERVAL = "lb.refresh_interval"
 
+// LoadBalancer working mode (i.e.: "MAB" or "RoundRobin")
+const LB_MODE = "lb.mode"
+
 // port for udp status listener
 const LISTEN_UDP_PORT = "registry.udp.port"
 

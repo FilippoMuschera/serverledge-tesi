@@ -1,0 +1,57 @@
+#!/bin/bash
+
+LOCUST_DURATION="10m"
+USERS=2
+SPAWN_RATE=2
+RESULT_FILE="experiment_results.csv"
+
+rm -f $RESULT_FILE
+
+echo "============================================="
+echo "STARTING BASELINE EXPERIMENT (ROUND ROBIN)"
+echo "============================================="
+
+
+export SERVERLEDGE_POLICY="RoundRobin"
+nohup ./bin/lb lb-config-RR.yaml > lb_rr.log 2>&1 &
+LB_PID=$!
+
+echo "Load Balancer started (PID: $LB_PID). Waiting for initialization..."
+sleep 10
+
+echo "Running Locust for $LOCUST_DURATION..."
+export LB_POLICY="RoundRobin"
+locust -f experiments/locustfile.py \
+    --headless \
+    --users $USERS \
+    --spawn-rate $SPAWN_RATE \
+    --run-time $LOCUST_DURATION \
+    --host http://localhost:1323
+
+echo "Stopping Load Balancer..."
+kill $LB_PID
+sleep 5
+
+echo "============================================="
+echo "STARTING MAB EXPERIMENT"
+echo "============================================="
+
+export SERVERLEDGE_POLICY="MAB"
+nohup ./bin/lb lb-config-MAB.yaml > lb_mab.log 2>&1 &
+LB_PID=$!
+
+echo "Load Balancer started (PID: $LB_PID). Waiting for initialization..."
+sleep 10
+
+echo "Running Locust for $LOCUST_DURATION..."
+export LB_POLICY="MAB"
+locust -f experiments/locustfile.py \
+    --headless \
+    --users $USERS \
+    --spawn-rate $SPAWN_RATE \
+    --run-time $LOCUST_DURATION \
+    --host http://localhost:1323
+
+kill $LB_PID
+
+echo "Experiments completed. Data saved to $RESULT_FILE"

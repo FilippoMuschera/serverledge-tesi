@@ -21,6 +21,9 @@ type ArchitectureAwareBalancer struct {
 	// instead of classic lists we will use hashRings (see hashRing.go) to implement a consistent hashing technique
 	armRing *HashRing
 	x86Ring *HashRing
+
+	mode    string
+	rrIndex int
 }
 
 // NewArchitectureAwareBalancer Constructor
@@ -35,6 +38,9 @@ func NewArchitectureAwareBalancer(targets []*middleware.ProxyTarget) *Architectu
 		armRing: NewHashRing(REPLICAS),
 		x86Ring: NewHashRing(REPLICAS),
 	}
+
+	b.mode = config.GetString(config.LB_MODE, MAB)
+	log.Printf("LB mode set to %s\n", b.mode)
 
 	// to stay consistent with the old RoundRobinLoadBalancer, we'll still a single target list, that will contain all nodes,
 	// both ARM and x86. We will now sort them into the respective hashRings.
@@ -62,19 +68,15 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 		return nil
 	}
 
-	/*
-		targetArch, err := b.selectArchitecture(fun) // here the load balancer decides what architecture to use for this function
-		if err != nil {
-			log.Printf("Failed to select a target for function '%s': %v", funcName, err)
-			return nil // No suitable node found
-		}
-	*/
 	targetArch := ""
+
 	if len(fun.SupportedArchs) == 1 { // If only one architecture is supported skip the MAB and just use that
 		targetArch = fun.SupportedArchs[0]
-	} else { // if both are supported, then use the MAB to select it
+	} else if b.mode == MAB { // if both are supported, then use the MAB to select it
 		bandit := mab.GlobalBanditManager.GetBandit(funcName)
 		targetArch = bandit.SelectArm()
+	} else { // RoundRobin
+		targetArch = b.selectArchitectureRR() // here the load balancer decides what architecture to use for this function
 	}
 
 	// once we selected an architecture, we'll use consistent hashing to select what node to use
@@ -174,6 +176,19 @@ func (b *ArchitectureAwareBalancer) selectArchitecture(fun *function.Function) (
 	}
 
 	return "", fmt.Errorf("function does not support any available architecture")
+}
+
+// selectArchitectureRR selects the architecture using a Round Robin policy.
+func (b *ArchitectureAwareBalancer) selectArchitectureRR() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// This is just a function to use as a baseline for the LB. It should actually implement checks over the rings dimension.
+	// i.e.: it cannot select ARM/X86 "blindly", it should check if we have at least one node for that architecture.
+	archs := []string{container.ARM, container.X86}
+	selected := archs[b.rrIndex]
+	b.rrIndex = (b.rrIndex + 1) % len(archs)
+	return selected
 }
 
 // AddTarget Echo requires this method for dynamic load-balancing. It simply inserts a new node in the respective ring.

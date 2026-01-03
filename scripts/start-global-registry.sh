@@ -4,8 +4,7 @@
 INTERNAL_IP=$(hostname -I | awk '{print $1}')
 
 # Find External IP (via Google Cloud metadata server)
-PUBLIC_IP=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
-
+PUBLIC_IP=$(curl -s --connect-timeout 2 --max-time 2 -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip 2>/dev/null)
 # Fallback if not on GCP or curl fails
 if [ -z "$PUBLIC_IP" ]; then
     echo "Could not determine Public IP. Using Internal as fallback."
