@@ -2,10 +2,6 @@ registry:
   area: "cloud-region"
   udp.port: 9877
 
-api:
-  ip: "1.2.3.4" # set to public IP of VM 
-  port: 1323
-
 
 etcd:
   address: "5.6.7.8:2379" # set to IP of VM hosting the LB (public one)

@@ -72,7 +72,9 @@ func (b *UCB1Bandit) SelectArm() string {
 
 	// Exploration parameter C (usually sqrt(2) ~= 1.41, but can be tuned)
 	// Higher values lead to more exploration. Lower values lead to more exploitation.
-	c := 1.41
+	//c := 1.41
+
+	c := 3.0
 
 	// 2. Calculate UCB1 score for each architecture
 	for arch, stats := range b.Arms {
