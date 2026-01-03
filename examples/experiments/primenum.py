@@ -2,7 +2,7 @@ import time
 import math
 
 
-CPU_MAX_PRIME = 50000
+CPU_MAX_PRIME = 100000
 
 def handler(params, context):
     max_prime = CPU_MAX_PRIME
