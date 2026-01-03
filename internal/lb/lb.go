@@ -93,6 +93,7 @@ func StartReverseProxy(e *echo.Echo, region string) {
 			// Remove the no-longer-needed headers
 			res.Header.Del("Serverledge-Node-Name")
 			res.Header.Del("Serverledge-Free-Mem")
+			res.Header.Set("Serverledge-Node-Arch", nodeArch)
 
 			return nil
 		},
