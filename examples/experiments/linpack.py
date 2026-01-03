@@ -2,7 +2,7 @@ import time
 import random
 
 
-MATRIX_SIZE = 300
+MATRIX_SIZE = 400
 
 def gaussian_elimination(A, B):
 
