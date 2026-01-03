@@ -1,7 +1,7 @@
 import time
 import csv
 import os
-from locust import HttpUser, task, between, events
+from locust import HttpUser, task, between, events, constant
 
 # Configuration
 CSV_FILE = "experiment_results.csv"
@@ -19,7 +19,8 @@ def on_test_start(environment, **kwargs):
 @events.request.add_listener
 def on_request(request_type, name, response_time, response_length, response, exception, context, **kwargs):
     if exception:
-        return # Don't log failed connection attempts in the main stats for now
+        print(f"Request failed: {exception}")
+        return
 
     # Extract the Architecture Header from the response
     node_arch = response.headers.get("Serverledge-Node-Arch", "unknown")
@@ -40,7 +41,7 @@ def on_request(request_type, name, response_time, response_length, response, exc
 
 class ServerledgeUser(HttpUser):
 
-    wait_time = 1
+    wait_time = constant(0.2)
 
     @task(1)
     def invoke_primenum(self):
