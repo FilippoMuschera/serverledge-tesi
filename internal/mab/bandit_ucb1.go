@@ -1,6 +1,7 @@
 package mab
 
 import (
+	"log"
 	"math"
 	"sync"
 )
@@ -74,13 +75,17 @@ func (b *UCB1Bandit) SelectArm() string {
 	// Higher values lead to more exploration. Lower values lead to more exploitation.
 	//c := 1.41
 
-	c := 0.75
+	c := 0.25
 
 	// 2. Calculate UCB1 score for each architecture
 	for arch, stats := range b.Arms {
 		// Formula: Q(a) + c * sqrt( ln(t) / N(a) ) where Q(a) is AvgReward, t is TotalCounts, N(a) is stats.Count
 		explorationBonus := c * math.Sqrt(math.Log(float64(b.TotalCounts))/float64(stats.Count))
 		score := stats.AvgReward + explorationBonus
+		log.Printf("Score for %s: %f\n", arch, score)
+		if score == 0.0 {
+			panic(0)
+		}
 
 		if score > bestScore {
 			bestScore = score // Update best score

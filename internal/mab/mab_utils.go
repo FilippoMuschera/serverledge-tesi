@@ -3,6 +3,7 @@ package mab
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/serverledge-faas/serverledge/internal/function"
@@ -34,6 +35,7 @@ func UpdateBandit(body []byte, reqPath string, arch string) error { // Read the 
 
 	// Reward = 1 / Duration (we don't consider cold start delay, since we want to focus on architectures' performance)
 	reward := 1.0 / response.ExecutionReport.Duration
+	log.Printf("Bandit Update. Reward for %s: %f\n", arch, reward)
 
 	// finally update the reward for the bandit. This is thread safe since internally it has a mutex
 	bandit.UpdateReward(arch, reward)

@@ -22,8 +22,8 @@ type ArchitectureAwareBalancer struct {
 	armRing *HashRing
 	x86Ring *HashRing
 
-	mode    string
-	rrIndex int
+	mode      string
+	rrIndices map[string]int
 }
 
 // NewArchitectureAwareBalancer Constructor
@@ -35,8 +35,9 @@ func NewArchitectureAwareBalancer(targets []*middleware.ProxyTarget) *Architectu
 	log.Printf("Running ArchitectureAwareLB with %d replicas per node in the hash rings\n", REPLICAS)
 
 	b := &ArchitectureAwareBalancer{
-		armRing: NewHashRing(REPLICAS),
-		x86Ring: NewHashRing(REPLICAS),
+		armRing:   NewHashRing(REPLICAS),
+		x86Ring:   NewHashRing(REPLICAS),
+		rrIndices: make(map[string]int),
 	}
 
 	b.mode = config.GetString(config.LB_MODE, MAB)
@@ -76,7 +77,7 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 		bandit := mab.GlobalBanditManager.GetBandit(funcName)
 		targetArch = bandit.SelectArm()
 	} else { // RoundRobin
-		targetArch = b.selectArchitectureRR() // here the load balancer decides what architecture to use for this function
+		targetArch = b.selectArchitectureRR(funcName) // here the load balancer decides what architecture to use for this function
 	}
 
 	// once we selected an architecture, we'll use consistent hashing to select what node to use
@@ -179,13 +180,14 @@ func (b *ArchitectureAwareBalancer) selectArchitecture(fun *function.Function) (
 }
 
 // selectArchitectureRR selects the architecture using a Round Robin policy.
-func (b *ArchitectureAwareBalancer) selectArchitectureRR() string {
+func (b *ArchitectureAwareBalancer) selectArchitectureRR(funcName string) string {
 
 	// This is just a function to use as a baseline for the LB. It should actually implement checks over the rings dimension.
 	// i.e.: it cannot select ARM/X86 "blindly", it should check if we have at least one node for that architecture.
 	archs := []string{container.ARM, container.X86}
-	selected := archs[b.rrIndex]
-	b.rrIndex = (b.rrIndex + 1) % len(archs)
+	index := b.rrIndices[funcName]
+	selected := archs[index]
+	b.rrIndices[funcName] = (index + 1) % len(archs)
 	return selected
 }
 
