@@ -74,6 +74,50 @@ for ax in g.axes.flat:
 plt.savefig('grafico_distribuzione.png')
 plt.show()
 
+# --- GRAPH 3: Architecture Choice Timeline (by policy, colored by function) ---
+
+# Ordiniamo temporalmente
+df_timeline = df.sort_values('timestamp').copy()
+
+# Indice temporale separato per policy
+df_timeline['decision_step'] = (
+    df_timeline
+    .groupby('policy')
+    .cumcount() + 1
+)
+
+# Mappatura architetture reali
+arch_mapping = {'arm64': 0, 'amd64': 1}
+df_timeline = df_timeline[df_timeline['node_arch'].isin(arch_mapping)]
+df_timeline['arch_numeric'] = df_timeline['node_arch'].map(arch_mapping)
+
+# Grafico: pannelli separati per policy, colori per funzione
+g = sns.relplot(
+    data=df_timeline,
+    x='decision_step',
+    y='arch_numeric',
+    hue='function',
+    col='policy',
+    kind='scatter',
+    height=4,
+    aspect=1.5,
+    s=45
+)
+
+# Etichette e titoli
+g.set_axis_labels("Decision step (ordine temporale)", "Architettura scelta")
+g.set_titles("Policy: {col_name}")
+
+for ax in g.axes.flat:
+    ax.set_yticks([0, 1])
+    ax.set_yticklabels(['ARM64', 'AMD64'])
+
+plt.suptitle("Cronologia delle decisioni architetturali nel tempo", y=1.05)
+plt.tight_layout()
+plt.savefig("grafico_timeline_decisioni.png")
+plt.show()
+
+
 # --- Textual Statistics ---
 print("\n=== Final Statistics ===")
 for p in policies:
@@ -85,3 +129,31 @@ for p in policies:
     print(f"  - Total Cumulative Time: {total_time:.2f} s")
     print(f"  - Average Time per Request: {sub['response_time_ms'].mean():.2f} ms")
     print("-" * 30)
+
+# --- Average Execution Time per Function and Architecture (Policy-independent) ---
+print("\n=== Average Execution Time per Function and Architecture ===")
+
+# Group by Function and Architecture, ignoring policy
+avg_func_arch = (
+    df
+    .groupby(['function', 'node_arch'])['response_time_ms']
+    .mean()
+    .reset_index()
+)
+
+# Sort for nicer output
+avg_func_arch = avg_func_arch.sort_values(by=['function', 'node_arch'])
+
+current_function = None
+for _, row in avg_func_arch.iterrows():
+    func = row['function']
+    arch = row['node_arch']
+    avg_time = row['response_time_ms']
+
+    # Print function header once
+    if func != current_function:
+        print(f"\nFunction: {func}")
+        current_function = func
+
+    print(f"  - {func} su {arch.upper()}: {avg_time:.2f} ms")
+
