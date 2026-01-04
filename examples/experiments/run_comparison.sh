@@ -8,19 +8,18 @@ RESULT_FILE="experiment_results.csv"
 rm -f $RESULT_FILE
 
 echo "============================================="
-echo "STARTING BASELINE EXPERIMENT (ROUND ROBIN)"
+echo "STARTING MAB EXPERIMENT"
 echo "============================================="
 
 
-export SERVERLEDGE_POLICY="RoundRobin"
-nohup ~/serverledge-tesi/bin/lb lb-config-RR.yaml > lb_rr.log 2>&1 &
+nohup ~/serverledge-tesi/bin/lb lb-config-MAB.yaml > lb_mab.log 2>&1 &
 LB_PID=$!
 
 echo "Load Balancer started (PID: $LB_PID). Waiting for initialization..."
-sleep 10
+sleep 3
 
 echo "Running Locust for $LOCUST_DURATION..."
-export LB_POLICY="RoundRobin"
+export LB_POLICY="MAB"
 locust -f locustfile.py \
     --headless \
     --users $USERS \
@@ -45,18 +44,17 @@ read -p "PRESS [ENTER] WHEN YOU ARE READY FOR PHASE 2 (MAB)..."
 echo ""
 
 echo "============================================="
-echo "STARTING MAB EXPERIMENT"
+echo "STARTING RoundRobin EXPERIMENT"
 echo "============================================="
 
-export SERVERLEDGE_POLICY="MAB"
-nohup ~/serverledge-tesi/bin/lb lb-config-MAB.yaml > lb_mab.log 2>&1 &
+nohup ~/serverledge-tesi/bin/lb lb-config-RR.yaml > lb_rr.log 2>&1 &
 LB_PID=$!
 
 echo "Load Balancer started (PID: $LB_PID). Waiting for initialization..."
-sleep 10
+sleep 3
 
 echo "Running Locust for $LOCUST_DURATION..."
-export LB_POLICY="MAB"
+export LB_POLICY="RoundRobin"
 locust -f locustfile.py \
     --headless \
     --users $USERS \

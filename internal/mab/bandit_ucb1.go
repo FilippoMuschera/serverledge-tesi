@@ -61,14 +61,14 @@ func (b *UCB1Bandit) SelectArm() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	minSampleCount := int64(15)
+	minSampleCount := int64(25)
 	currentMinSample := int64(math.MaxInt64)
 	leastTriedArch := ""
 
 	// 1. If an arm hasn't tried at least minSampleCount times, it has to be tried. If both haven't reached this threshold,
 	// we choose the one with fewer tries.
 	for arch, stats := range b.Arms {
-		if stats.Count <= minSampleCount && stats.Count < currentMinSample {
+		if stats.Count < minSampleCount && stats.Count < currentMinSample {
 			currentMinSample = stats.Count
 			leastTriedArch = arch
 		}

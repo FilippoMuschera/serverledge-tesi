@@ -13,7 +13,7 @@ def on_test_start(environment, **kwargs):
     if not os.path.exists(CSV_FILE):
         with open(CSV_FILE, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["timestamp", "function", "response_time_ms", "node_arch", "status_code", "policy"])
+            writer.writerow(["timestamp", "function", "response_time_ms", "node_arch", "status_code", "policy", "locust_response_time"])
 
 # Hook to capture every request and log custom data
 @events.request.add_listener
@@ -28,15 +28,25 @@ def on_request(request_type, name, response_time, response_length, response, exc
     # Identify the policy from environment variable (set before running locust)
     policy = os.environ.get("LB_POLICY", "unknown")
 
+    serverledge_response_time = "unknown"
+    try:
+        # Attempt to parse the JSON response to get the server-side response time
+        data = response.json()
+        if "ResponseTime" in data:
+            serverledge_response_time = data["ResponseTime"]
+    except Exception:
+        pass
+
     with open(CSV_FILE, "a", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
             time.time(),
             name,
-            response_time,
+            serverledge_response_time,
             node_arch,
             response.status_code,
-            policy
+            policy,
+            response_time
         ])
 
 class ServerledgeUser(HttpUser):
