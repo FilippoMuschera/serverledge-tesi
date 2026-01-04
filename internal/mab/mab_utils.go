@@ -33,6 +33,15 @@ func UpdateBandit(body []byte, reqPath string, arch string) error { // Read the 
 	if response.ExecutionReport.Duration <= 0 {
 		return fmt.Errorf("invalid execution duration: %f", response.ExecutionReport.Duration)
 	}
+	if !response.IsWarmStart { // don't consider cold start even if we only look at execution times. Cache is still cold and this value is
+		// likely an outlier
+
+		// Redact this run, like it never existed (these values were incremented when the arm was chosen)
+		bandit.TotalCounts--
+		bandit.Arms[arch].Count--
+		return nil
+
+	}
 
 	// Reward = 1 / Duration (we don't consider cold start delay, since we want to focus on architectures' performance)
 	durationMs := response.ExecutionReport.Duration * 1000.0 // s to ms

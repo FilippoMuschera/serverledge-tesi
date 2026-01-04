@@ -75,6 +75,8 @@ func (b *UCB1Bandit) SelectArm() string {
 	}
 	if leastTriedArch != "" {
 		log.Printf("Using (forced) least tried arch: %s", leastTriedArch)
+		b.TotalCounts++
+		b.Arms[leastTriedArch].Count = b.Arms[leastTriedArch].Count + 1
 		return leastTriedArch
 	}
 
@@ -85,7 +87,7 @@ func (b *UCB1Bandit) SelectArm() string {
 	// Higher values lead to more exploration. Lower values lead to more exploitation.
 	//c := 1.41
 
-	c := 0.1
+	c := 0.2
 
 	// 2. Calculate UCB1 score for each architecture
 	for arch, stats := range b.Arms {
@@ -103,6 +105,9 @@ func (b *UCB1Bandit) SelectArm() string {
 		log.Printf("Couldn't select any ARM. Panic\n")
 		panic(1)
 	}
+	b.TotalCounts++
+	b.Arms[bestArch].Count = b.Arms[bestArch].Count + 1
+
 	return bestArch
 }
 
@@ -118,9 +123,9 @@ func (b *UCB1Bandit) UpdateReward(arch string, reward float64) {
 
 	stats := b.Arms[arch]
 
-	// Update global and local counts
-	b.TotalCounts++
-	stats.Count++
+	// Update global and local counts. This is done as soon as we know the selected arm now
+	// b.TotalCounts++
+	// stats.Count++
 
 	// Update average reward
 	stats.SumRewards += reward
