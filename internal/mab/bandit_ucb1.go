@@ -75,7 +75,7 @@ func (b *UCB1Bandit) SelectArm() string {
 	// Higher values lead to more exploration. Lower values lead to more exploitation.
 	//c := 1.41
 
-	c := 0.25
+	c := 1.41
 
 	// 2. Calculate UCB1 score for each architecture
 	for arch, stats := range b.Arms {

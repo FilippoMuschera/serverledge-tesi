@@ -34,7 +34,8 @@ func UpdateBandit(body []byte, reqPath string, arch string) error { // Read the 
 	}
 
 	// Reward = 1 / Duration (we don't consider cold start delay, since we want to focus on architectures' performance)
-	reward := 1.0 / response.ExecutionReport.Duration
+	durationMs := response.ExecutionReport.Duration * 1000.0 // s to ms
+	reward := 1_000_000.0 / durationMs
 	log.Printf("Bandit Update. Reward for %s: %f\n", arch, reward)
 
 	// finally update the reward for the bandit. This is thread safe since internally it has a mutex
