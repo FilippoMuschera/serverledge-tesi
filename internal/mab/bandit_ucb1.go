@@ -61,21 +61,31 @@ func (b *UCB1Bandit) SelectArm() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// 1. If an arm has never been tried, it has absolute priority (Forced Exploration)
+	minSampleCount := int64(15)
+	currentMinSample := int64(math.MaxInt64)
+	leastTriedArch := ""
+
+	// 1. If an arm hasn't tried at least minSampleCount times, it has to be tried. If both haven't reached this threshold,
+	// we choose the one with fewer tries.
 	for arch, stats := range b.Arms {
-		if stats.Count == 0 {
-			return arch
+		if stats.Count <= minSampleCount && stats.Count < currentMinSample {
+			currentMinSample = stats.Count
+			leastTriedArch = arch
 		}
 	}
+	if leastTriedArch != "" {
+		log.Printf("Using (forced) least tried arch: %s", leastTriedArch)
+		return leastTriedArch
+	}
 
-	bestScore := -1.0 // Initialize with a very low score
+	bestScore := -math.MaxFloat64 // Initialize with a very low score
 	bestArch := ""
 
 	// Exploration parameter C (usually sqrt(2) ~= 1.41, but can be tuned)
 	// Higher values lead to more exploration. Lower values lead to more exploitation.
 	//c := 1.41
 
-	c := 1.41
+	c := 0.1
 
 	// 2. Calculate UCB1 score for each architecture
 	for arch, stats := range b.Arms {
@@ -83,16 +93,16 @@ func (b *UCB1Bandit) SelectArm() string {
 		explorationBonus := c * math.Sqrt(math.Log(float64(b.TotalCounts))/float64(stats.Count))
 		score := stats.AvgReward + explorationBonus
 		log.Printf("Score for %s: %f\n", arch, score)
-		if score == 0.0 {
-			panic(0)
-		}
 
 		if score > bestScore {
 			bestScore = score // Update best score
 			bestArch = arch
 		}
 	}
-
+	if bestArch == "" {
+		log.Printf("Couldn't select any ARM. Panic\n")
+		panic(1)
+	}
 	return bestArch
 }
 

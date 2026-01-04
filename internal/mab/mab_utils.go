@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"strings"
 
 	"github.com/serverledge-faas/serverledge/internal/function"
@@ -35,7 +36,7 @@ func UpdateBandit(body []byte, reqPath string, arch string) error { // Read the 
 
 	// Reward = 1 / Duration (we don't consider cold start delay, since we want to focus on architectures' performance)
 	durationMs := response.ExecutionReport.Duration * 1000.0 // s to ms
-	reward := 1_000_000.0 / durationMs
+	reward := -math.Log(durationMs)                          // new test: reward as negative Log to handle better very slow and very fast exec times
 	log.Printf("Bandit Update. Reward for %s: %f\n", arch, reward)
 
 	// finally update the reward for the bandit. This is thread safe since internally it has a mutex
