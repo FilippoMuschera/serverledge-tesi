@@ -1,6 +1,6 @@
 #!/bin/bash
 
-LOCUST_DURATION="10m"
+LOCUST_DURATION="5m"
 USERS=2
 SPAWN_RATE=2
 RESULT_FILE="experiment_results.csv"
@@ -38,9 +38,9 @@ echo "###########################################################"
 echo "Phase 1 has ended."
 echo ""
 echo "NOW REBOOT BOTH X86 AND ARM TARGET NODES"
-echo "Otherwise, the MAB will start with warm containers, and this will mean an uneven comparison"
+echo "Otherwise, the RR will start with warm containers, and this will mean an uneven comparison"
 echo ""
-read -p "PRESS [ENTER] WHEN YOU ARE READY FOR PHASE 2 (MAB)..."
+read -p "PRESS [ENTER] WHEN YOU ARE READY FOR PHASE 2 (RR)..."
 echo ""
 
 echo "============================================="
