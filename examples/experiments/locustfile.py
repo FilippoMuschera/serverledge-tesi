@@ -49,15 +49,18 @@ def on_request(request_type, name, response_time, response_length, response, exc
             response_time
         ])
 
-class ServerledgeUser(HttpUser):
-
+class AmdUser(HttpUser):
     wait_time = constant(0.0)
+    weight = 1
 
-    @task(1)
+    @task
     def invoke_amd_faster(self):
-        # The name parameter is used to group stats in Locust UI
         self.client.post("/invoke/amd_faster", json={"params": {}}, name="amd_faster")
 
-    @task(1)
+class ArmUser(HttpUser):
+    wait_time = constant(0.0)
+    weight = 1
+
+    @task
     def invoke_arm_faster(self):
         self.client.post("/invoke/arm_faster", json={"params": {}}, name="arm_faster")
