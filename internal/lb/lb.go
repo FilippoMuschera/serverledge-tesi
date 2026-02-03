@@ -70,13 +70,14 @@ func StartReverseProxy(e *echo.Echo, region string) {
 			// Extract the necessary data for UpdateBandit
 			nodeArch := res.Header.Get("Serverledge-Node-Arch")
 			reqPath := res.Request.URL.Path
+			reqID := res.Request.Header.Get("Serverledge-MAB-Request-ID")
 
-			go func(data []byte, path string, arch string) {
-				err := mab.UpdateBandit(data, path, arch)
+			go func(data []byte, path string, arch string, reqID string) {
+				err := mab.UpdateBandit(data, path, arch, reqID)
 				if err != nil {
 					log.Printf("Failed to update bandit: %v", err)
 				}
-			}(bodyBytes, reqPath, nodeArch)
+			}(bodyBytes, reqPath, nodeArch, reqID)
 
 			nodeName := res.Header.Get("Serverledge-Node-Name")
 			freeMemStr := res.Header.Get("Serverledge-Free-Mem")
@@ -84,7 +85,7 @@ func StartReverseProxy(e *echo.Echo, region string) {
 			if nodeName != "" && freeMemStr != "" {
 				freeMem, err := strconv.ParseInt(freeMemStr, 10, 64)
 				if err == nil {
-					NodeMetrics.Update(nodeName, freeMem, time.Now().Unix())
+					NodeMetrics.Update(nodeName, freeMem, 0, time.Now().Unix())
 
 					log.Printf("[LB-Update] Node %s reported %d MB free", nodeName, freeMem)
 				}
@@ -156,8 +157,9 @@ func updateTargets(balancer middleware.ProxyBalancer, region string) {
 					// Since we're keeping this node, we'll update it's free memory info.
 					nodeInfo := GetSingleTargetInfo(curr)
 					if nodeInfo != nil {
-						freeMemoryMB := nodeInfo.TotalMemory - nodeInfo.UsedMemory
-						NodeMetrics.Update(curr.Name, freeMemoryMB, nodeInfo.LastUpdateTime)
+						totalMemory := nodeInfo.TotalMemory
+						freeMemoryMB := totalMemory - nodeInfo.UsedMemory
+						NodeMetrics.Update(curr.Name, freeMemoryMB, totalMemory, nodeInfo.LastUpdateTime)
 					}
 
 				}
@@ -177,8 +179,9 @@ func updateTargets(balancer middleware.ProxyBalancer, region string) {
 				// If we keep this node, then we'll update its info about free memory
 				nodeInfo := GetSingleTargetInfo(curr)
 				if nodeInfo != nil {
-					freeMemoryMB := nodeInfo.TotalMemory - nodeInfo.UsedMemory
-					NodeMetrics.Update(curr.Name, freeMemoryMB, nodeInfo.LastUpdateTime)
+					totalMemory := nodeInfo.TotalMemory
+					freeMemoryMB := totalMemory - nodeInfo.UsedMemory
+					NodeMetrics.Update(curr.Name, freeMemoryMB, totalMemory, nodeInfo.LastUpdateTime)
 				}
 			}
 		}
