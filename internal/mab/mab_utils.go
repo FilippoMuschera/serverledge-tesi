@@ -10,7 +10,7 @@ import (
 	"github.com/serverledge-faas/serverledge/internal/function"
 )
 
-func UpdateBandit(body []byte, reqPath string, arch string) error { // Read the body
+func UpdateBandit(body []byte, reqPath string, arch string, reqID string) error { // Read the body
 	// Parse the body to a Response object
 	var response function.Response
 	if err := json.Unmarshal(body, &response); err != nil {
@@ -24,21 +24,31 @@ func UpdateBandit(body []byte, reqPath string, arch string) error { // Read the 
 	functionName := pathParts[len(pathParts)-1]
 
 	bandit := GlobalBanditManager.GetBandit(functionName)
+	ctx := GlobalContextStorage.RetrieveAndDelete(reqID)
 
 	if arch == "" {
-		return fmt.Errorf("Serverledge-Node-Arch header missing")
+		log.Println("Serverledge-Node-Arch header missing")
+		panic(0) // should never happen
 	}
 
 	// Calculate the reward for this execution
 	if response.ExecutionReport.Duration <= 0 {
-		return fmt.Errorf("invalid execution duration: %f", response.ExecutionReport.Duration)
+		log.Printf("invalid execution duration: %f", response.ExecutionReport.Duration)
+		panic(1) // should never happen
 	}
 	if !response.IsWarmStart { // don't consider cold start even if we only look at execution times. Cache is still cold and this value is
 		// likely an outlier
 
-		// Redact this run, like it never existed (these values were incremented when the arm was chosen)
-		bandit.TotalCounts--
-		bandit.Arms[arch].Count--
+		ucb1, ok := bandit.(*UCB1Bandit)
+
+		if ok { // Redact this run, like it never existed (these values were incremented when the arm was chosen). UCB1 Bandit only
+			if ctx != nil {
+				log.Println("Bandit is a UCB but LinUCB ctx is not nil! This should never happen!")
+				panic(2)
+			}
+			ucb1.TotalCounts--
+			ucb1.Arms[arch].Count--
+		}
 		return nil
 
 	}
@@ -49,7 +59,7 @@ func UpdateBandit(body []byte, reqPath string, arch string) error { // Read the 
 	log.Printf("Bandit Update. Reward for %s: %f\n", arch, reward)
 
 	// finally update the reward for the bandit. This is thread safe since internally it has a mutex
-	bandit.UpdateReward(arch, reward)
+	bandit.UpdateReward(arch, reward, ctx)
 
 	return nil
 }
