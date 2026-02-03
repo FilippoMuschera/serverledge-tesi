@@ -22,42 +22,19 @@ type UCB1Bandit struct {
 	mu          sync.RWMutex         // Mutex per thread-safety
 }
 
-// BanditManager contains all the existing bandits (one for each known function)
-type BanditManager struct {
-	bandits map[string]*UCB1Bandit
-	mu      sync.RWMutex
-}
-
-var GlobalBanditManager *BanditManager
-
-// InitBanditManager sets up the bandit manager
-func InitBanditManager() {
-	GlobalBanditManager = &BanditManager{
-		bandits: make(map[string]*UCB1Bandit),
+// InitArm adds a new arm to the bandit
+func (b *UCB1Bandit) InitArm(arm string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if _, exists := b.Arms[arm]; !exists {
+		b.Arms[arm] = &ArmStats{Count: 0, SumRewards: 0, AvgReward: 0}
 	}
-}
-
-// GetBandit returns (or creates) the bandit for a given function
-func (bm *BanditManager) GetBandit(functionName string) *UCB1Bandit {
-	bm.mu.Lock()
-	defer bm.mu.Unlock()
-
-	if _, exists := bm.bandits[functionName]; !exists {
-		// if we don't have one, then create a new bandit for this function and put it in the bandits map
-		bm.bandits[functionName] = &UCB1Bandit{
-			TotalCounts: 0,
-			Arms: map[string]*ArmStats{
-				"amd64": {Count: 0, SumRewards: 0, AvgReward: 0},
-				"arm64": {Count: 0, SumRewards: 0, AvgReward: 0},
-			},
-		}
-	}
-	return bm.bandits[functionName]
 }
 
 // SelectArm implements UCB-1 formulas
-// Returns the suggested architecture to use ("amd64" o "arm64")
-func (b *UCB1Bandit) SelectArm() string {
+// Returns the suggested architecture to use ("amd64" o "arm64").
+// ctx *Ctx is necessary even if not used to be compliant with the interface.
+func (b *UCB1Bandit) SelectArm(ctx *Context) string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -112,8 +89,8 @@ func (b *UCB1Bandit) SelectArm() string {
 }
 
 // UpdateReward updates bandit stats after execution. For now reward is 1.0 / executionTime (not considering setup time).
-// It may be fine-tuned in the future.
-func (b *UCB1Bandit) UpdateReward(arch string, reward float64) {
+// It may be fine-tuned in the future. ctx *Context is need even if it's unused to be compliant with the interface.
+func (b *UCB1Bandit) UpdateReward(arch string, reward float64, ctx *Context) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
