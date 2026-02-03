@@ -30,7 +30,7 @@ push-images:
 
 # Runs integration tests (all tests EXCEPT unit tests)
 test:
-	$(GO) test -v $(shell $(GO) list ./... | grep -v 'internal/container')
+	$(GO) test -v $(shell $(GO) list ./... | grep -Ev 'internal/container|examples')
 
 # Runs only unit tests
 unit-test:
