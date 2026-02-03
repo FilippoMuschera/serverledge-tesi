@@ -9,6 +9,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/lithammer/shortuuid"
 	"github.com/serverledge-faas/serverledge/internal/config"
 	"github.com/serverledge-faas/serverledge/internal/container"
 	"github.com/serverledge-faas/serverledge/internal/function"
@@ -69,13 +70,22 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 		return nil
 	}
 
+	reqID := shortuuid.New()
+	c.Request().Header.Set("Serverledge-MAB-Request-ID", reqID)
+
 	targetArch := ""
+
+	var ctx *mab.Context = nil
+	if b.mode == MAB {
+		ctx = b.calculateSystemContext()           // memory snapshot for the MAB LinUCB
+		mab.GlobalContextStorage.Store(reqID, ctx) // Cache it for LinUCB update
+	}
 
 	if len(fun.SupportedArchs) == 1 { // If only one architecture is supported skip the MAB and just use that
 		targetArch = fun.SupportedArchs[0]
 	} else if b.mode == MAB { // if both are supported, then use the MAB to select it
 		bandit := mab.GlobalBanditManager.GetBandit(funcName)
-		targetArch = bandit.SelectArm()
+		targetArch = bandit.SelectArm(ctx)
 	} else { // RoundRobin
 		targetArch = b.selectArchitectureRR(funcName) // here the load balancer decides what architecture to use for this function
 	}
@@ -98,7 +108,7 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 	if candidate != nil {
 		freeMemoryMB := NodeMetrics.GetFreeMemory(candidate.Name) - fun.MemoryMB
 		// Remove the memory that this function will use (this will then be updated again once the function is executed)
-		NodeMetrics.Update(candidate.Name, freeMemoryMB, time.Now().Unix())
+		NodeMetrics.Update(candidate.Name, freeMemoryMB, 0, time.Now().Unix())
 
 	}
 	return candidate
@@ -116,6 +126,8 @@ func extractFunctionName(c echo.Context) string {
 	return path[len(prefix):]
 }
 
+// Deprecated
+// This should only be used for tests or as a baseline in experiments.
 // selectArchitecture checks the function's runtime to see what architecture it can support. Then it checks if any
 // available node of the corresponding architecture is available. If the runtime supports both architecture, then we
 // have a tie-break and select a node from the chosen list (arm or x86).
@@ -199,10 +211,11 @@ func (b *ArchitectureAwareBalancer) AddTarget(t *middleware.ProxyTarget) bool {
 	nodeInfo := GetSingleTargetInfo(t)
 	// Every time we add a node, we set the information about its available memory
 	if nodeInfo != nil {
-		freeMemoryMB := nodeInfo.TotalMemory - nodeInfo.UsedMemory
+		totalMemoryMb := nodeInfo.TotalMemory
+		freeMemoryMB := totalMemoryMb - nodeInfo.UsedMemory
 		// Update will update the freeMemory only if the information in nodeInfo is fresher than what we
 		// already have in the NodeMetrics cache.
-		NodeMetrics.Update(t.Name, freeMemoryMB, nodeInfo.LastUpdateTime)
+		NodeMetrics.Update(t.Name, freeMemoryMB, totalMemoryMb, nodeInfo.LastUpdateTime)
 	}
 	// Decide if target belongs to ARM or x86
 	if t.Meta["arch"] == container.ARM {
