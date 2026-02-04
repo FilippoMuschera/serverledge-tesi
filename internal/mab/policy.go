@@ -1,5 +1,12 @@
 package mab
 
+type BanditType string
+
+const (
+	UCB1   BanditType = "UCB1"
+	LinUCB BanditType = "LinUCB"
+)
+
 // Context carries the state of the system at the time of decision.
 // Currently, it holds memory usage, but can be extended (i.e.: we could also add % of cpu load)
 // It is used only by contextual MABs, obviously. The UCB1 doesn't need this since it works without context.
@@ -19,4 +26,7 @@ type Policy interface {
 
 	// InitArm initializes a new arm before it is used. So it will be easier to implement more than 2 arms for new architectures.
 	InitArm(arm string)
+
+	// GetType returns the type of the bandit policy.
+	GetType() BanditType
 }

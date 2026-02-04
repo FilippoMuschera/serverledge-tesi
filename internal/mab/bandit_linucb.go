@@ -167,3 +167,7 @@ func (p *LinUCBDisjointPolicy) computeFeatures(memUsage float64) *mat.VecDense {
 
 	return mat.NewVecDense(p.Dim, []float64{bias, sigma})
 }
+
+func (p *LinUCBDisjointPolicy) GetType() BanditType {
+	return LinUCB
+}

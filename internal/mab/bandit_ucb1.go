@@ -108,3 +108,7 @@ func (b *UCB1Bandit) UpdateReward(arch string, reward float64, ctx *Context) {
 	stats.SumRewards += reward
 	stats.AvgReward = stats.SumRewards / float64(stats.Count)
 }
+
+func (b *UCB1Bandit) GetType() BanditType {
+	return UCB1
+}
