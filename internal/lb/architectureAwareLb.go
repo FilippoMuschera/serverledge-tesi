@@ -41,7 +41,7 @@ func NewArchitectureAwareBalancer(targets []*middleware.ProxyTarget) *Architectu
 		rrIndices: make(map[string]int),
 	}
 
-	b.mode = config.GetString(config.LB_MODE, MAB)
+	b.mode = config.GetString(config.LB_MODE, RR)
 	log.Printf("LB mode set to %s\n", b.mode)
 
 	// to stay consistent with the old RoundRobinLoadBalancer, we'll still a single target list, that will contain all nodes,
