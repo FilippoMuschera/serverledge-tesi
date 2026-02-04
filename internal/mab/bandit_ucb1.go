@@ -20,6 +20,8 @@ type UCB1Bandit struct {
 	TotalCounts int64                // number of total executions (t)
 	Arms        map[string]*ArmStats // Map "amd64" -> Stats, "arm64" -> Stats for each arm
 	mu          sync.RWMutex         // Mutex per thread-safety
+	c           float64              // Exploration parameter C (usually sqrt(2) ~= 1.41, but can be tuned)
+	// Higher values lead to more exploration. Lower values lead to more exploitation.
 }
 
 // InitArm adds a new arm to the bandit
@@ -60,16 +62,10 @@ func (b *UCB1Bandit) SelectArm(ctx *Context) string {
 	bestScore := -math.MaxFloat64 // Initialize with a very low score
 	bestArch := ""
 
-	// Exploration parameter C (usually sqrt(2) ~= 1.41, but can be tuned)
-	// Higher values lead to more exploration. Lower values lead to more exploitation.
-	//c := 1.41
-
-	c := 0.2
-
 	// 2. Calculate UCB1 score for each architecture
 	for arch, stats := range b.Arms {
 		// Formula: Q(a) + c * sqrt( ln(t) / N(a) ) where Q(a) is AvgReward, t is TotalCounts, N(a) is stats.Count
-		explorationBonus := c * math.Sqrt(math.Log(float64(b.TotalCounts))/float64(stats.Count))
+		explorationBonus := b.c * math.Sqrt(math.Log(float64(b.TotalCounts))/float64(stats.Count))
 		score := stats.AvgReward + explorationBonus
 		log.Printf("Score for %s: %f\n", arch, score)
 
@@ -99,10 +95,6 @@ func (b *UCB1Bandit) UpdateReward(arch string, reward float64, ctx *Context) {
 	}
 
 	stats := b.Arms[arch]
-
-	// Update global and local counts. This is done as soon as we know the selected arm now
-	// b.TotalCounts++
-	// stats.Count++
 
 	// Update average reward
 	stats.SumRewards += reward

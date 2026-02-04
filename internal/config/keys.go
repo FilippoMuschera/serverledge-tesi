@@ -62,6 +62,9 @@ const LB_MODE = "lb.mode"
 // Policy for the Multi Armed Bandit (MAB) (i.e.: "LinUcb" or "UCB1")
 const MAB_POLICY = "mab.policy"
 
+// C value for the UCB1 policy
+const MAB_UCB1_C = "mab.ucb1.c"
+
 // Aplha value for the LinUCB policy
 const MAB_LINUCB_ALPHA = "mab.linucb.alpha"
 

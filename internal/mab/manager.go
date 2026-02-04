@@ -45,6 +45,7 @@ func (bm *BanditManager) GetBandit(functionName string) Policy {
 			newBandit = &UCB1Bandit{
 				TotalCounts: 0,
 				Arms:        map[string]*ArmStats{},
+				c:           config.GetFloat(config.MAB_UCB1_C, 0.8),
 			}
 			log.Printf("Initialized UCB1 bandit for %s", functionName)
 		}
