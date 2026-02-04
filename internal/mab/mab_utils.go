@@ -39,13 +39,12 @@ func UpdateBandit(body []byte, reqPath string, arch string, reqID string) error 
 	if !response.IsWarmStart { // don't consider cold start even if we only look at execution times. Cache is still cold and this value is
 		// likely an outlier
 
-		ucb1, ok := bandit.(*UCB1Bandit)
-
-		if ok { // Redact this run, like it never existed (these values were incremented when the arm was chosen). UCB1 Bandit only
+		if bandit.GetType() == UCB1 { // Redact this run, like it never existed (these values were incremented when the arm was chosen). UCB1 Bandit only
 			if ctx != nil {
 				log.Println("Bandit is a UCB but LinUCB ctx is not nil! This should never happen!")
 				panic(2)
 			}
+			ucb1 := bandit.(*UCB1Bandit)
 			ucb1.TotalCounts--
 			ucb1.Arms[arch].Count--
 		}
