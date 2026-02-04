@@ -122,7 +122,7 @@ func (p *LinUCBDisjointPolicy) SelectArm(ctx *Context) string {
 	return bestArm
 }
 
-// UpdateReward updates A and b for the chosen arm. Context is necessary to keep track of the memory usage IN THE MOMENT
+// UpdateReward updates A and b for the chosen arm. Context is necessary to keep track of the memory usage AT THE MOMENT
 // the decision was taken. So it has to be a "snapshot" of memory at that given time.
 func (p *LinUCBDisjointPolicy) UpdateReward(arm string, reward float64, ctx *Context) {
 	p.mu.Lock()
