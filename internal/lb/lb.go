@@ -94,6 +94,9 @@ func StartReverseProxy(e *echo.Echo, region string) {
 			// Remove the no-longer-needed headers
 			res.Header.Del("Serverledge-Node-Name")
 			res.Header.Del("Serverledge-Free-Mem")
+			res.Header.Del("Serverledge-MAB-Request-ID")
+
+			// for experiments: we need to know which node ran the function
 			res.Header.Set("Serverledge-Node-Arch", nodeArch)
 
 			return nil
