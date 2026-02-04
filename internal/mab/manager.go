@@ -29,14 +29,15 @@ func (bm *BanditManager) GetBandit(functionName string) Policy {
 
 	if _, exists := bm.bandits[functionName]; !exists {
 		// Read policy from config
-		policyType := config.GetString("MAB_POLICY", "UCB1")
+		policyType := config.GetString(config.MAB_POLICY, "UCB1")
+		log.Printf("BanditManager GetBandit: policy type: %s\n", policyType)
 
 		var newBandit Policy
 
 		switch policyType {
 		case "LinUCB":
 			// Alpha param could also be in config
-			alpha := config.GetFloat("MAB_LINUCB_ALPHA", 0.1)
+			alpha := config.GetFloat("MAB_LINUCB_ALPHA", 0.3)
 			newBandit = NewLinUCBDisjointPolicy(alpha)
 			log.Printf("Initialized LinUCB bandit for %s", functionName)
 		default:
