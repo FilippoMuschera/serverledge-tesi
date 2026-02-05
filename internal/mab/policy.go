@@ -22,7 +22,7 @@ type Policy interface {
 
 	// UpdateReward updates the internal model of the policy based on the feedback.
 	// It requires the context that was present when the decision was made (if the MAB has a context).
-	UpdateReward(arm string, reward float64, ctx *Context)
+	UpdateReward(arm string, ctx *Context, isWarmStart bool, durationMs float64)
 
 	// InitArm initializes a new arm before it is used. So it will be easier to implement more than 2 arms for new architectures.
 	InitArm(arm string)

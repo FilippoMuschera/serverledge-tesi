@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"strings"
 
 	"github.com/serverledge-faas/serverledge/internal/function"
@@ -36,29 +35,12 @@ func UpdateBandit(body []byte, reqPath string, arch string, reqID string) error 
 		log.Printf("invalid execution duration: %f", response.ExecutionReport.Duration)
 		panic(1) // should never happen
 	}
-	if !response.IsWarmStart { // don't consider cold start even if we only look at execution times. Cache is still cold and this value is
-		// likely an outlier
-
-		if bandit.GetType() == UCB1 { // Redact this run, like it never existed (these values were incremented when the arm was chosen). UCB1 Bandit only
-			if ctx != nil {
-				log.Println("Bandit is a UCB but LinUCB ctx is not nil! This should never happen!")
-				panic(2)
-			}
-			ucb1 := bandit.(*UCB1Bandit)
-			ucb1.TotalCounts--
-			ucb1.Arms[arch].Count--
-		}
-		return nil
-
-	}
 
 	// Reward = 1 / Duration (we don't consider cold start delay, since we want to focus on architectures' performance)
 	durationMs := response.ExecutionReport.Duration * 1000.0 // s to ms
-	reward := -math.Log(durationMs)                          // new test: reward as negative Log to handle better very slow and very fast exec times
-	log.Printf("Bandit Update. Reward for %s: %f\n", arch, reward)
 
 	// finally update the reward for the bandit. This is thread safe since internally it has a mutex
-	bandit.UpdateReward(arch, reward, ctx)
+	bandit.UpdateReward(arch, ctx, response.IsWarmStart, durationMs)
 
 	return nil
 }

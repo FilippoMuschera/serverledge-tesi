@@ -86,15 +86,28 @@ func (b *UCB1Bandit) SelectArm(ctx *Context) string {
 
 // UpdateReward updates bandit stats after execution. For now reward is 1.0 / executionTime (not considering setup time).
 // It may be fine-tuned in the future. ctx *Context is need even if it's unused to be compliant with the interface.
-func (b *UCB1Bandit) UpdateReward(arch string, reward float64, ctx *Context) {
+func (b *UCB1Bandit) UpdateReward(arch string, ctx *Context, isWarmStart bool, durationMs float64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	if ctx != nil {
+		log.Println("Bandit is a UCB but LinUCB ctx is not nil! This should never happen!")
+		panic(2)
+	}
+	if !isWarmStart { // redact this run if it was not a warm start. Likely to be an outlier.
+		b.TotalCounts--
+		b.Arms[arch].Count--
+		return
+	}
 
 	if _, ok := b.Arms[arch]; !ok {
 		return // Should not happen
 	}
 
 	stats := b.Arms[arch]
+
+	// reward calculation
+	reward := -math.Log(durationMs) // reward as negative Log to handle better very slow and very fast exec times
 
 	// Update average reward
 	stats.SumRewards += reward
