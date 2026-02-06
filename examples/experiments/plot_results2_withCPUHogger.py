@@ -8,7 +8,7 @@ import matplotlib.patches as mpatches
 # Configurazione stile
 sns.set_theme(style="whitegrid")
 # Palette colori ad alto contrasto per distinguere le policy
-custom_palette = {"MAB_LinUCB": "#E63946", "RoundRobin": "#457B9D"}
+custom_palette = {"MAB_LinUCB": "#E63946", "MAB_UCB1": "#457B9D", "RoundRobin": "#26ac26"}
 
 def analyze_locust_experiment(file_path):
     # 1. Caricamento Dati Principali
