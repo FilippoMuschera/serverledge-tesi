@@ -29,7 +29,7 @@ for p in policies:
     # Recalculate a progressive index (Request ID) from 1 to N
     subset['request_id'] = range(1, len(subset) + 1)
     # Calculate cumulative
-    subset['cumulative_time_s'] = subset['response_time_ms'].cumsum() / 1000.0
+    subset['cumulative_time_s'] = subset['response_time_ms'].cumsum() # they're already seconds, actually
     df_trimmed = pd.concat([df_trimmed, subset])
 
 # --- GRAPH 1: Cumulative Time (Monotonic Curves) ---
@@ -130,30 +130,37 @@ for p in policies:
     print(f"  - Average Time per Request: {sub['response_time_ms'].mean():.2f} ms")
     print("-" * 30)
 
-# --- Average Execution Time per Function and Architecture (Policy-independent) ---
-print("\n=== Average Execution Time per Function and Architecture ===")
+# --- Average Execution Time per Function, Architecture and Policy ---
+print("\n=== Average Execution Time per Function and Architecture (by Policy) ===")
 
-# Group by Function and Architecture, ignoring policy
-avg_func_arch = (
+avg_func_arch_policy = (
     df
-    .groupby(['function', 'node_arch'])['response_time_ms']
+    .groupby(['policy', 'function', 'node_arch'])['response_time_ms']
     .mean()
     .reset_index()
+    .sort_values(by=['policy', 'function', 'node_arch'])
 )
 
-# Sort for nicer output
-avg_func_arch = avg_func_arch.sort_values(by=['function', 'node_arch'])
-
+current_policy = None
 current_function = None
-for _, row in avg_func_arch.iterrows():
+
+for _, row in avg_func_arch_policy.iterrows():
+    policy = row['policy']
     func = row['function']
     arch = row['node_arch']
     avg_time = row['response_time_ms']
 
-    # Print function header once
+    # Nuova policy
+    if policy != current_policy:
+        print(f"\nPolicy: {policy}")
+        current_policy = policy
+        current_function = None
+
+    # Nuova funzione (dentro la policy)
     if func != current_function:
-        print(f"\nFunction: {func}")
+        print(f"  Function: {func}")
         current_function = func
 
-    print(f"  - {func} su {arch.upper()}: {avg_time:.2f} ms")
+    print(f"    - {func} su {arch.upper()}: {avg_time:.2f} ms")
+
 
