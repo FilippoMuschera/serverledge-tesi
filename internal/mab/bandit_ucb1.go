@@ -40,6 +40,7 @@ func (b *UCB1Bandit) SelectArm(ctx *Context) string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	ctx = nil // not used, favor garbage collection
 	minSampleCount := int64(25)
 	currentMinSample := int64(math.MaxInt64)
 	leastTriedArch := ""
@@ -91,8 +92,7 @@ func (b *UCB1Bandit) UpdateReward(arch string, ctx *Context, isWarmStart bool, d
 	defer b.mu.Unlock()
 
 	if ctx != nil {
-		log.Println("Bandit is a UCB but LinUCB ctx is not nil! This should never happen!")
-		panic(2)
+		ctx = nil // is not used here but will still be set in MAB mode, help garbage collection to get rid of this
 	}
 	if !isWarmStart { // redact this run if it was not a warm start. Likely to be an outlier.
 		b.TotalCounts--
