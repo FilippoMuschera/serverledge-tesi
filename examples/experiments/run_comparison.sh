@@ -19,7 +19,7 @@ echo "Load Balancer started (PID: $LB_PID). Waiting for initialization..."
 sleep 3
 
 echo "Running Locust for $LOCUST_DURATION..."
-export LB_POLICY="MAB"
+export LB_POLICY="MAB_LinUCB"
 locust -f locustfile.py \
     --headless \
     --users $USERS \
