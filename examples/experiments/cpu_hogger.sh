@@ -9,10 +9,12 @@ start_ts=$(date +%s.%N)
 
 end_ts=$(date +%s.%N)
 
-{
-    echo "timestamp"
-    echo "$start_ts"
-    echo "$end_ts"
-} > "$OUTPUT_FILE"
+if [[ ! -s "$OUTPUT_FILE" ]]; then
+    printf "start_ts,end_ts\n" >> "$OUTPUT_FILE"
+fi
+
+printf "%s,%s\n" "$start_ts" "$end_ts" >> "$OUTPUT_FILE"
+
+
 
 echo "Done"
