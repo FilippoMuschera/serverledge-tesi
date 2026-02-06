@@ -41,7 +41,7 @@ func (b *UCB1Bandit) SelectArm(ctx *Context) string {
 	defer b.mu.Unlock()
 
 	ctx = nil // not used, favor garbage collection
-	minSampleCount := int64(25)
+	minSampleCount := int64(1)
 	currentMinSample := int64(math.MaxInt64)
 	leastTriedArch := ""
 
