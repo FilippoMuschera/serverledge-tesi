@@ -11,11 +11,12 @@ import (
 )
 
 type HashRing struct {
-	replicas   int
-	ring       []uint32                           // actual ring with hash of nodes
-	targets    map[uint32]*middleware.ProxyTarget // mapping hash(es) <-> node. Each node will have #replicas entries in the ring
-	memChecker MemoryChecker                      // function to check if the node selected has enough memory to execute the function
-	// implemented this way to make the code testable by mocking this struct/function.
+	replicas int
+	ring     []uint32                           // actual ring with hash of nodes
+	targets  map[uint32]*middleware.ProxyTarget // mapping hash(es) <-> node. Each node will have #replicas entries in the ring
+	// function to check if the node selected has enough memory to execute the function
+	targetList []*middleware.ProxyTarget // list of target. Cached instead of iterating on targets every time.
+	memChecker MemoryChecker             // implemented this way to make the code testable by mocking this struct/function.
 
 }
 
@@ -25,6 +26,7 @@ func NewHashRing(replicas int) *HashRing {
 		replicas:   replicas,
 		ring:       make([]uint32, 0),
 		targets:    make(map[uint32]*middleware.ProxyTarget),
+		targetList: make([]*middleware.ProxyTarget, 0),
 		memChecker: &DefaultMemoryChecker{},
 	}
 }
@@ -38,6 +40,7 @@ func (r *HashRing) Add(t *middleware.ProxyTarget) {
 		r.targets[h] = t
 	}
 	sort.Slice(r.ring, func(i, j int) bool { return r.ring[i] < r.ring[j] }) // sort the ring by hash
+	r.targetList = append(r.targetList, t)
 }
 
 func (r *HashRing) Get(fun *function.Function) *middleware.ProxyTarget {
@@ -105,21 +108,32 @@ func (r *HashRing) RemoveByName(name string) bool {
 	if removed {
 		r.ring = newRing
 		sort.Slice(r.ring, func(i, j int) bool { return r.ring[i] < r.ring[j] })
+		r.removeFromTargetList(name)
+
 	}
 
 	return removed
 }
 
+func (r *HashRing) removeFromTargetList(targetName string) {
+	newList := r.targetList[:0]
+	for _, t := range r.targetList {
+		if t.Name != targetName {
+			newList = append(newList, t)
+		}
+	}
+	r.targetList = newList
+}
+
 // Size returns the number of UNIQUE nodes in the ring, not the numbers of total nodes (which is = nUniqueNodes * Replicas)
 func (r *HashRing) Size() int {
 
-	// Maybe simply doing "len(r.targets) / replicas could" be an easy solution? This one is more robust for sure.
+	return len(r.targetList)
 
-	seen := make(map[*middleware.ProxyTarget]struct{})
-	for _, t := range r.targets {
-		seen[t] = struct{}{}
-	}
-	return len(seen)
+}
+
+func (r *HashRing) GetAllTargets() []*middleware.ProxyTarget {
+	return r.targetList
 }
 
 // hash function uses the FNV-1a function. It has good distribution and is fast to compute. It's not cryptographically safe,

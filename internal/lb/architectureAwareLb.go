@@ -9,9 +9,11 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/lithammer/shortuuid"
 	"github.com/serverledge-faas/serverledge/internal/config"
 	"github.com/serverledge-faas/serverledge/internal/container"
 	"github.com/serverledge-faas/serverledge/internal/function"
+	"github.com/serverledge-faas/serverledge/internal/mab"
 )
 
 type ArchitectureAwareBalancer struct {
@@ -20,6 +22,9 @@ type ArchitectureAwareBalancer struct {
 	// instead of classic lists we will use hashRings (see hashRing.go) to implement a consistent hashing technique
 	armRing *HashRing
 	x86Ring *HashRing
+
+	mode      string
+	rrIndices map[string]int
 }
 
 // NewArchitectureAwareBalancer Constructor
@@ -31,9 +36,13 @@ func NewArchitectureAwareBalancer(targets []*middleware.ProxyTarget) *Architectu
 	log.Printf("Running ArchitectureAwareLB with %d replicas per node in the hash rings\n", REPLICAS)
 
 	b := &ArchitectureAwareBalancer{
-		armRing: NewHashRing(REPLICAS),
-		x86Ring: NewHashRing(REPLICAS),
+		armRing:   NewHashRing(REPLICAS),
+		x86Ring:   NewHashRing(REPLICAS),
+		rrIndices: make(map[string]int),
 	}
+
+	b.mode = config.GetString(config.LB_MODE, RR)
+	log.Printf("LB mode set to %s\n", b.mode)
 
 	// to stay consistent with the old RoundRobinLoadBalancer, we'll still a single target list, that will contain all nodes,
 	// both ARM and x86. We will now sort them into the respective hashRings.
@@ -61,10 +70,24 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 		return nil
 	}
 
-	targetArch, err := b.selectArchitecture(fun) // here the load balancer decides what architecture to use for this function
-	if err != nil {
-		log.Printf("Failed to select a target for function '%s': %v", funcName, err)
-		return nil // No suitable node found
+	reqID := shortuuid.New()
+	c.Request().Header.Set("Serverledge-MAB-Request-ID", reqID)
+
+	targetArch := ""
+
+	var ctx *mab.Context = nil
+	if b.mode == MAB {
+		ctx = b.calculateSystemContext()           // memory snapshot for the MAB LinUCB
+		mab.GlobalContextStorage.Store(reqID, ctx) // Cache it for LinUCB update
+	}
+
+	if len(fun.SupportedArchs) == 1 { // If only one architecture is supported skip the MAB and just use that
+		targetArch = fun.SupportedArchs[0]
+	} else if b.mode == MAB { // if both are supported, then use the MAB to select it
+		bandit := mab.GlobalBanditManager.GetBandit(funcName)
+		targetArch = bandit.SelectArm(ctx)
+	} else { // RoundRobin
+		targetArch = b.selectArchitectureRR(funcName) // here the load balancer decides what architecture to use for this function
 	}
 
 	// once we selected an architecture, we'll use consistent hashing to select what node to use
@@ -85,7 +108,7 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 	if candidate != nil {
 		freeMemoryMB := NodeMetrics.GetFreeMemory(candidate.Name) - fun.MemoryMB
 		// Remove the memory that this function will use (this will then be updated again once the function is executed)
-		NodeMetrics.Update(candidate.Name, freeMemoryMB, time.Now().Unix())
+		NodeMetrics.Update(candidate.Name, freeMemoryMB, 0, time.Now().Unix())
 
 	}
 	return candidate
@@ -103,6 +126,8 @@ func extractFunctionName(c echo.Context) string {
 	return path[len(prefix):]
 }
 
+// Deprecated
+// This should only be used for tests or as a baseline in experiments.
 // selectArchitecture checks the function's runtime to see what architecture it can support. Then it checks if any
 // available node of the corresponding architecture is available. If the runtime supports both architecture, then we
 // have a tie-break and select a node from the chosen list (arm or x86).
@@ -166,6 +191,18 @@ func (b *ArchitectureAwareBalancer) selectArchitecture(fun *function.Function) (
 	return "", fmt.Errorf("function does not support any available architecture")
 }
 
+// selectArchitectureRR selects the architecture using a Round Robin policy.
+func (b *ArchitectureAwareBalancer) selectArchitectureRR(funcName string) string {
+
+	// This is just a function to use as a baseline for the LB. It should actually implement checks over the rings dimension.
+	// i.e.: it cannot select ARM/X86 "blindly", it should check if we have at least one node for that architecture.
+	archs := []string{container.ARM, container.X86}
+	index := b.rrIndices[funcName]
+	selected := archs[index]
+	b.rrIndices[funcName] = (index + 1) % len(archs)
+	return selected
+}
+
 // AddTarget Echo requires this method for dynamic load-balancing. It simply inserts a new node in the respective ring.
 func (b *ArchitectureAwareBalancer) AddTarget(t *middleware.ProxyTarget) bool {
 	b.mu.Lock()
@@ -174,10 +211,11 @@ func (b *ArchitectureAwareBalancer) AddTarget(t *middleware.ProxyTarget) bool {
 	nodeInfo := GetSingleTargetInfo(t)
 	// Every time we add a node, we set the information about its available memory
 	if nodeInfo != nil {
-		freeMemoryMB := nodeInfo.TotalMemory - nodeInfo.UsedMemory
+		totalMemoryMb := nodeInfo.TotalMemory
+		freeMemoryMB := totalMemoryMb - nodeInfo.UsedMemory
 		// Update will update the freeMemory only if the information in nodeInfo is fresher than what we
 		// already have in the NodeMetrics cache.
-		NodeMetrics.Update(t.Name, freeMemoryMB, nodeInfo.LastUpdateTime)
+		NodeMetrics.Update(t.Name, freeMemoryMB, totalMemoryMb, nodeInfo.LastUpdateTime)
 	}
 	// Decide if target belongs to ARM or x86
 	if t.Meta["arch"] == container.ARM {

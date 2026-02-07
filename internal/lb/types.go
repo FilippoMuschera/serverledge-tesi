@@ -5,8 +5,13 @@ import (
 	"sync"
 
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/serverledge-faas/serverledge/internal/container"
 	"github.com/serverledge-faas/serverledge/internal/function"
+	"github.com/serverledge-faas/serverledge/internal/mab"
 )
+
+const MAB = "MAB"
+const RR = "RoundRobin"
 
 var AllMemoryAvailable = int64(10_000_000) // A high value to symbolize all memory is free
 
@@ -35,8 +40,9 @@ var ArchitectureCacheLB = &ArchitectureCache{
 }
 
 type NodeMetric struct {
-	FreeMemoryMB int64
-	LastUpdate   int64
+	TotalMemoryMB int64
+	FreeMemoryMB  int64
+	LastUpdate    int64
 }
 
 type NodeMetricCache struct {
@@ -54,16 +60,23 @@ type ArchitectureCache struct {
 	cache map[string]ArchitectureCacheEntry
 }
 
-func (c *NodeMetricCache) Update(nodeName string, freeMemMB int64, updateTime int64) {
+// Update info about memory of a specific node. If totalMemMB = 0, then we keep the previous value.
+func (c *NodeMetricCache) Update(nodeName string, freeMemMB int64, totalMemMB int64, updateTime int64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	curr, ok := c.metrics[nodeName]
 	if ok && (updateTime < curr.LastUpdate) {
 		return // if this branch is taken, we do not update. The info we already have is "fresher" than the one we received now
 	}
+
+	if totalMemMB == 0 && ok {
+		totalMemMB = curr.TotalMemoryMB
+	}
+
 	c.metrics[nodeName] = NodeMetric{
-		FreeMemoryMB: freeMemMB,
-		LastUpdate:   updateTime,
+		TotalMemoryMB: totalMemMB,
+		FreeMemoryMB:  freeMemMB,
+		LastUpdate:    updateTime,
 	}
 }
 
@@ -81,4 +94,49 @@ func (c *NodeMetricCache) GetFreeMemory(nodeName string) int64 {
 	}
 
 	return val.FreeMemoryMB
+}
+
+// Calculate the avg utilization of each architecture
+func (b *ArchitectureAwareBalancer) calculateSystemContext() *mab.Context {
+
+	archs := []string{container.ARM, container.X86}
+	usageMap := make(map[string]float64)
+
+	for _, arch := range archs {
+		var totalFree int64 = 0
+		var totalCap int64 = 0
+
+		var nodes []*middleware.ProxyTarget
+		if arch == container.ARM {
+			nodes = b.armRing.GetAllTargets()
+		} else {
+			nodes = b.x86Ring.GetAllTargets()
+		}
+
+		if len(nodes) == 0 {
+			usageMap[arch] = 100.0 // If no node let's assume it's full. This architecture will not be used anyway.
+			continue
+		}
+
+		for _, node := range nodes {
+
+			NodeMetrics.mu.RLock() // Assumo tu abbia reso pubblico il mutex o aggiunto un metodo Getter completo
+			metric, ok := NodeMetrics.metrics[node.Name]
+			NodeMetrics.mu.RUnlock()
+
+			if ok && metric.TotalMemoryMB > 0 {
+				totalFree += metric.FreeMemoryMB
+				totalCap += metric.TotalMemoryMB
+			} else {
+				log.Printf("[AALB] Node %s has a TotalMemoryMB attribute = 0. It wasn't initialized correctly?\n", node.Name)
+				panic(0) // it should never happen
+			}
+		}
+
+		used := float64(totalCap - totalFree)
+		usageMap[arch] = used / float64(totalCap) // % utilization (0.0 - 1.0) fort this specific architecture
+
+	}
+
+	return &mab.Context{ArchMemUsage: usageMap}
 }

@@ -1,6 +1,6 @@
 module github.com/serverledge-faas/serverledge
 
-go 1.24
+go 1.24.0
 
 replace github.com/distribution/reference => github.com/distribution/reference v0.5.0
 
@@ -25,8 +25,10 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.28.0
 	go.opentelemetry.io/otel/sdk v1.38.0
 	go.opentelemetry.io/otel/trace v1.38.0
+	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
 	golang.org/x/net v0.43.0
+	gonum.org/v1/gonum v0.17.0
 	google.golang.org/grpc v1.75.0
 )
 

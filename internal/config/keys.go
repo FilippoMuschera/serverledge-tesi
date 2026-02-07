@@ -56,6 +56,18 @@ const REPLICAS = "lb.replicas"
 // LoadBalancer refresh interval (in seconds)
 const LB_REFRESH_INTERVAL = "lb.refresh_interval"
 
+// LoadBalancer working mode (i.e.: "MAB" or "RoundRobin")
+const LB_MODE = "lb.mode"
+
+// Policy for the Multi Armed Bandit (MAB) (i.e.: "LinUcb" or "UCB1")
+const MAB_POLICY = "mab.policy"
+
+// C value for the UCB1 policy
+const MAB_UCB1_C = "mab.ucb1.c"
+
+// Aplha value for the LinUCB policy
+const MAB_LINUCB_ALPHA = "mab.linucb.alpha"
+
 // port for udp status listener
 const LISTEN_UDP_PORT = "registry.udp.port"
 
