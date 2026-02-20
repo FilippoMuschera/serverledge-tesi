@@ -3,34 +3,40 @@ import csv
 import os
 from locust import HttpUser, task, between, events, constant
 
-# Configuration
 CSV_FILE = "experiment_results.csv"
 
-# Hook to initialize the CSV file when the test starts
 @events.test_start.add_listener
 def on_test_start(environment, **kwargs):
-    # If file doesn't exist, write headers
     if not os.path.exists(CSV_FILE):
         with open(CSV_FILE, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["timestamp", "function", "response_time_ms", "node_arch", "status_code", "policy", "locust_response_time"])
+            writer.writerow(["timestamp", "function", "response_time_s", "node_arch", "status_code", "policy", "locust_response_time"])
 
-# Hook to capture every request and log custom data
 @events.request.add_listener
 def on_request(request_type, name, response_time, response_length, response, exception, context, **kwargs):
-    if exception:
-        print(f"Request failed: {exception}")
-        return
-
-    # Extract the Architecture Header from the response
-    node_arch = response.headers.get("Serverledge-Node-Arch", "unknown")
-
-    # Identify the policy from environment variable (set before running locust)
     policy = os.environ.get("LB_POLICY", "unknown")
 
+    # GESTIONE DEI FALLIMENTI
+    if exception:
+        print(f"Request failed: {exception}")
+        with open(CSV_FILE, "a", newline="") as f:
+            writer = csv.writer(f)
+            # Scriviamo il fallimento nel CSV. Usiamo il nome dell'eccezione come status code.
+            writer.writerow([
+                time.time(),
+                name,
+                "unknown", # Nessun tempo di risposta dal server
+                "unknown", # Nessuna architettura
+                f"FAILED: {type(exception).__name__}",
+                policy,
+                response_time or 0
+            ])
+        return
+
+    node_arch = response.headers.get("Serverledge-Node-Arch", "unknown")
     serverledge_response_time = "unknown"
+
     try:
-        # Attempt to parse the JSON response to get the server-side response time
         data = response.json()
         if "ResponseTime" in data:
             serverledge_response_time = data["ResponseTime"]
@@ -49,9 +55,11 @@ def on_request(request_type, name, response_time, response_length, response, exc
             response_time
         ])
 
+# --- CLASSI UTENTE ---
+
 class AmdUser(HttpUser):
     wait_time = constant(0.0)
-    weight = 1
+    weight = 1 # Peso relativo
 
     @task
     def invoke_amd_faster(self):
@@ -59,8 +67,16 @@ class AmdUser(HttpUser):
 
 class ArmUser(HttpUser):
     wait_time = constant(0.0)
-    weight = 1
+    weight = 1 # Peso relativo
 
     @task
     def invoke_arm_faster(self):
         self.client.post("/invoke/arm_faster", json={"params": {}}, name="arm_faster")
+
+class ThirdFunctionUser(HttpUser):
+    wait_time = constant(0.0)
+    weight = 0
+
+    @task
+    def invoke_third(self):
+        self.client.post("/invoke/third_function", json={"params": {}}, name="third_function")
