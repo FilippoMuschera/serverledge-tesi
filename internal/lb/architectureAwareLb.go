@@ -193,8 +193,6 @@ func (b *ArchitectureAwareBalancer) selectArchitecture(fun *function.Function) (
 
 // selectArchitectureRR selects the architecture using a Round Robin policy.
 func (b *ArchitectureAwareBalancer) selectArchitectureRR(funcName string) string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
 
 	// This is just a function to use as a baseline for the LB. It should actually implement checks over the rings dimension.
 	// i.e.: it cannot select ARM/X86 "blindly", it should check if we have at least one node for that architecture.
