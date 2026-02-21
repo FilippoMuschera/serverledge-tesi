@@ -68,6 +68,9 @@ const MAB_UCB1_C = "mab.ucb1.c"
 // Aplha value for the LinUCB policy
 const MAB_LINUCB_ALPHA = "mab.linucb.alpha"
 
+// Lambda value for the LinUCB policy, used for the memory penalty of reward
+const MAB_LINUCB_LAMBDA = "mab.linucb.lambda"
+
 // port for udp status listener
 const LISTEN_UDP_PORT = "registry.udp.port"
 

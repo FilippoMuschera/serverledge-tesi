@@ -5,6 +5,7 @@ import (
 	"math"
 	"sync"
 
+	"github.com/serverledge-faas/serverledge/internal/config"
 	"gonum.org/v1/gonum/mat" // for matrix operations
 )
 
@@ -146,7 +147,9 @@ func (p *LinUCBDisjointPolicy) UpdateReward(arm string, ctx *Context, isWarmStar
 		log.Printf("[LinUCB] Warning: Context is nil for arm %s", arm)
 		panic(4) // should never happen
 	}
-	reward := -math.Log(durationMs) // reward as negative Log to handle better very slow and very fast exec times
+	lambda := config.GetFloat(config.MAB_LINUCB_LAMBDA, 0.7)
+	// reward as negative Log to handle better very slow and very fast exec times plus eventual memory penalty
+	reward := -math.Log(durationMs) - (lambda * memPenalty(memUsage))
 	x := p.computeFeatures(memUsage)
 
 	// Update A: A = A + x * x^T
@@ -158,6 +161,12 @@ func (p *LinUCBDisjointPolicy) UpdateReward(arm string, ctx *Context, isWarmStar
 	var scaledX mat.VecDense
 	scaledX.ScaleVec(reward, x)
 	state.b.AddVec(state.b, &scaledX)
+}
+
+func memPenalty(memUsage float64) float64 {
+	// Grows from 0 at 0.7 utilization to 1 at 1.0 utilization
+	penalty := (memUsage - 0.7) / 0.3 // (memUsage - 0.7) / (1 - 0.7)
+	return max(0.0, penalty)
 }
 
 // computeFeatures transforms raw context data into the feature vector [1, sigma(u)].
