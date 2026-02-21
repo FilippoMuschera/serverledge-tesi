@@ -3,6 +3,7 @@ package lb
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -86,8 +87,10 @@ func (b *ArchitectureAwareBalancer) Next(c echo.Context) *middleware.ProxyTarget
 	} else if b.mode == MAB { // if both are supported, then use the MAB to select it
 		bandit := mab.GlobalBanditManager.GetBandit(funcName)
 		targetArch = bandit.SelectArm(ctx)
-	} else { // RoundRobin
+	} else if b.mode == RR { // RoundRobin
 		targetArch = b.selectArchitectureRR(funcName) // here the load balancer decides what architecture to use for this function
+	} else { // Random
+		targetArch = b.selectArchitectureRandom() // random load balancer for testing purposes
 	}
 
 	// once we selected an architecture, we'll use consistent hashing to select what node to use
@@ -242,4 +245,12 @@ func (b *ArchitectureAwareBalancer) RemoveTarget(name string) bool {
 	}
 	return false
 
+}
+
+func (b *ArchitectureAwareBalancer) selectArchitectureRandom() string {
+	archs := []string{container.ARM, container.X86}
+	// Seed the random number generator if needed, though global rand is usually fine for simple LB
+	// rand.Seed(time.Now().UnixNano())
+	index := rand.Intn(len(archs))
+	return archs[index]
 }
