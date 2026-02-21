@@ -58,7 +58,7 @@ def on_request(request_type, name, response_time, response_length, response, exc
 # --- CLASSI UTENTE ---
 
 class AmdUser(HttpUser):
-    wait_time = constant(1.0)
+    wait_time = constant(0.0)
     weight = 1 # Peso relativo
 
     @task
@@ -66,7 +66,7 @@ class AmdUser(HttpUser):
         self.client.post("/invoke/amd_faster", json={"params": {}}, name="amd_faster")
 
 class ArmUser(HttpUser):
-    wait_time = constant(1.0)
+    wait_time = constant(0.0)
     weight = 1 # Peso relativo
 
     @task

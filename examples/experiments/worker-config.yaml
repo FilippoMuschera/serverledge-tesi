@@ -9,4 +9,4 @@ etcd:
 
 container:
   pool:
-    memory: 8192
+    memory: 10000
