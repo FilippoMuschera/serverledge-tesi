@@ -147,7 +147,7 @@ func (p *LinUCBDisjointPolicy) UpdateReward(arm string, ctx *Context, isWarmStar
 		log.Printf("[LinUCB] Warning: Context is nil for arm %s", arm)
 		panic(4) // should never happen
 	}
-	lambda := config.GetFloat(config.MAB_LINUCB_LAMBDA, 0.7)
+	lambda := config.GetFloat(config.MAB_LINUCB_LAMBDA, 0.0)
 	// reward as negative Log to handle better very slow and very fast exec times plus eventual memory penalty
 	reward := -math.Log(durationMs) - (lambda * memPenalty(memUsage))
 	x := p.computeFeatures(memUsage)
@@ -165,7 +165,7 @@ func (p *LinUCBDisjointPolicy) UpdateReward(arm string, ctx *Context, isWarmStar
 
 func memPenalty(memUsage float64) float64 {
 	// Grows from 0 at 0.7 utilization to 1 at 1.0 utilization
-	penalty := (memUsage - 0.7) / 0.3 // (memUsage - 0.7) / (1 - 0.7)
+	penalty := (memUsage - 0.75) / 0.3 // (memUsage - 0.7) / (1 - 0.7)
 	return max(0.0, penalty)
 }
 

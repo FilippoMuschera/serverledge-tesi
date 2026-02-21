@@ -37,7 +37,7 @@ func (bm *BanditManager) GetBandit(functionName string) Policy {
 		switch policyType {
 		case "LinUCB":
 			// Alpha param could also be in config
-			alpha := config.GetFloat(config.MAB_LINUCB_ALPHA, 0.3)
+			alpha := config.GetFloat(config.MAB_LINUCB_ALPHA, 0.1)
 			newBandit = NewLinUCBDisjointPolicy(alpha)
 			log.Printf("Initialized LinUCB bandit for %s", functionName)
 		default:
